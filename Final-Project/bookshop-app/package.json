@@ -9,13 +9,12 @@
         "test": "jest --silent"
     },
     "dependencies": {
-        "@sap/cds": "^7",
-        "@sap/cds-hana": "^2",
+        "@sap/cds": "^9.8",
         "express": "^4"
     },
     "devDependencies": {
-        "@cap-js/sqlite": "^1",
-        "@sap/cds-dk": "^7",
+        "@cap-js/sqlite": "^2",
+        "@sap/cds-dk": "^9",
         "jest": "^29"
     },
     "cds": {

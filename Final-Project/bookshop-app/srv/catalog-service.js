@@ -4,7 +4,7 @@ module.exports = class CatalogService extends cds.ApplicationService {
 
     async init() {
         const db = await cds.connect.to('db');
-        const { Books, OrderItems, Orders, Reviews } = db.entities('com.tecrise.bookshop');
+        const { Books, OrderItems, Orders, Reviews } = cds.entities('com.tecrise.bookshop');
 
         // ---- Validation: Before CREATE Books ----
         this.before('CREATE', 'Books', (req) => {

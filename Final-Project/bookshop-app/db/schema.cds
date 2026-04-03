@@ -1,6 +1,6 @@
 namespace com.tecrise.bookshop;
 
-using { Currency, managed, cuid, CodeList } from '@sap/cds/common';
+using { Currency, managed, cuid } from '@sap/cds/common';
 
 // ============================================
 // ENTITY: Authors
@@ -15,10 +15,12 @@ entity Authors : cuid, managed {
 }
 
 // ============================================
-// ENTITY: Genres (CodeList — master data)
+// ENTITY: Genres (master data / lookup)
 // ============================================
-entity Genres : CodeList {
+entity Genres {
     key code    : String(4);
+    name        : String(100);
+    descr       : String(500);
     parent      : Association to Genres;
     children    : Composition of many Genres on children.parent = $self;
 }
