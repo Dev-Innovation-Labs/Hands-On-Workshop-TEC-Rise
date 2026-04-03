@@ -5,6 +5,7 @@
     "scripts": {
         "start": "cds-serve",
         "watch": "cds watch",
+        "watch:local": "CDS_ENV=local cds watch",
         "build": "cds build --production",
         "test": "jest --silent"
     },
@@ -34,6 +35,9 @@
         },
         "log": {
             "level": "info"
+        },
+        "server": {
+            "index": false
         }
     }
 }

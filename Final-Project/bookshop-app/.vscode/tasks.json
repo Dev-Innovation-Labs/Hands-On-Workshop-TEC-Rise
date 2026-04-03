@@ -1,0 +1,20 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Bookshop CAP Server",
+			"type": "shell",
+			"command": "cds watch",
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Start Bookshop CAP Server",
+			"type": "shell",
+			"command": "cds watch",
+			"isBackground": true,
+			"problemMatcher": []
+		}
+	]
+}

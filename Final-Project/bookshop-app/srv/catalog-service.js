@@ -4,7 +4,12 @@ module.exports = class CatalogService extends cds.ApplicationService {
 
     async init() {
         const db = await cds.connect.to('db');
-        const { Books, OrderItems, Orders, Reviews } = cds.entities('com.tecrise.bookshop');
+
+        // CDS v9: reference entities by namespace string (lazy, model-independent)
+        const Books      = 'com.tecrise.bookshop.Books';
+        const Orders     = 'com.tecrise.bookshop.Orders';
+        const OrderItems = 'com.tecrise.bookshop.OrderItems';
+        const Reviews    = 'com.tecrise.bookshop.Reviews';
 
         // ---- Validation: Before CREATE Books ----
         this.before('CREATE', 'Books', (req) => {
