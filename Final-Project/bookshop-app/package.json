@@ -1,0 +1,40 @@
+{
+    "name": "bookshop-tecrise",
+    "version": "1.0.0",
+    "description": "TEC Rise Bookshop — SAP CAP Application",
+    "scripts": {
+        "start": "cds-serve",
+        "watch": "cds watch",
+        "build": "cds build --production",
+        "test": "jest --silent"
+    },
+    "dependencies": {
+        "@sap/cds": "^7",
+        "@sap/cds-hana": "^2",
+        "express": "^4"
+    },
+    "devDependencies": {
+        "@cap-js/sqlite": "^1",
+        "@sap/cds-dk": "^7",
+        "jest": "^29"
+    },
+    "cds": {
+        "requires": {
+            "db": {
+                "kind": "sqlite",
+                "[production]": {
+                    "kind": "hana"
+                }
+            },
+            "auth": {
+                "kind": "mocked",
+                "[production]": {
+                    "kind": "xsuaa"
+                }
+            }
+        },
+        "log": {
+            "level": "info"
+        }
+    }
+}

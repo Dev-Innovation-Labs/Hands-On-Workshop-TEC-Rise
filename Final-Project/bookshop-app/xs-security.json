@@ -1,0 +1,60 @@
+{
+    "xsappname": "bookshop-tecrise",
+    "tenant-mode": "dedicated",
+    "description": "TEC Rise Bookshop XSUAA Security Configuration",
+    "scopes": [
+        {
+            "name": "$XSAPPNAME.read",
+            "description": "Read books, authors and orders"
+        },
+        {
+            "name": "$XSAPPNAME.write",
+            "description": "Create and update books, submit orders"
+        },
+        {
+            "name": "$XSAPPNAME.admin",
+            "description": "Full administrative access"
+        }
+    ],
+    "role-templates": [
+        {
+            "name": "Viewer",
+            "description": "Can browse the bookshop catalog",
+            "scope-references": ["$XSAPPNAME.read"]
+        },
+        {
+            "name": "Editor",
+            "description": "Can submit orders and write reviews",
+            "scope-references": [
+                "$XSAPPNAME.read",
+                "$XSAPPNAME.write"
+            ]
+        },
+        {
+            "name": "Administrator",
+            "description": "Full access including admin operations",
+            "scope-references": [
+                "$XSAPPNAME.read",
+                "$XSAPPNAME.write",
+                "$XSAPPNAME.admin"
+            ]
+        }
+    ],
+    "role-collections": [
+        {
+            "name": "Bookshop_Viewer",
+            "description": "Bookshop read-only users",
+            "role-template-references": ["$XSAPPNAME.Viewer"]
+        },
+        {
+            "name": "Bookshop_Editor",
+            "description": "Bookshop editors / customers",
+            "role-template-references": ["$XSAPPNAME.Editor"]
+        },
+        {
+            "name": "Bookshop_Admin",
+            "description": "Bookshop administrators",
+            "role-template-references": ["$XSAPPNAME.Administrator"]
+        }
+    ]
+}
