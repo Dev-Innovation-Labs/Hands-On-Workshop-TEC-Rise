@@ -10,6 +10,11 @@ service CatalogService @(path: '/catalog') {
     entity Books as projection on db.Books {
         *,
         author.name as authorName,
+        case
+            when stock >= 20 then 3  // Green  (Positive)
+            when stock >  0  then 2  // Orange (Warning)
+            else                 1   // Red    (Negative)
+        end as stockCriticality : Integer
     } excluding { orders };
 
     @readonly

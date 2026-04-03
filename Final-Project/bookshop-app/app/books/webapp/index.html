@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TEC Rise Bookshop</title>
+
+    <script>
+        window["sap-ushell-config"] = {
+            defaultRenderer : "fiori2",
+            renderers: {
+                fiori2: {
+                    componentData: {
+                        config: {
+                            search: "hidden",
+                            moveHomeActionToShell: true,
+                            rootIntent: "Shell-home"
+                        }
+                    }
+                }
+            },
+            applications: {
+                "Books-display": {
+                    title       : "Books Catalog",
+                    description : "Browse and manage books",
+                    additionalInformation: "SAPUI5.Component=com.tecrise.bookshop.books",
+                    applicationType : "URL",
+                    url         : "/books/webapp",
+                    navigationMode: "embedded"
+                }
+            }
+        };
+    </script>
+
+    <!-- Fiori Sandbox Launchpad bootstrap -->
+    <script
+        src="https://ui5.sap.com/test-resources/sap/ushell/bootstrap/sandbox.js"
+        id="sap-ushell-bootstrap">
+    </script>
+
+    <!-- SAPUI5 core -->
+    <script id="sap-ui-bootstrap"
+        src="https://ui5.sap.com/resources/sap-ui-core.js"
+        data-sap-ui-libs="sap.m,sap.fe.templates"
+        data-sap-ui-theme="sap_horizon"
+        data-sap-ui-compatVersion="edge"
+        data-sap-ui-async="true"
+        data-sap-ui-frameOptions="allow"
+        data-sap-ui-preload="async">
+    </script>
+
+    <script>
+        sap.ui.getCore().attachInit(function () {
+            sap.ushell.Container.createRenderer().placeAt("content");
+        });
+    </script>
+</head>
+<body class="sapUiBody" id="content"></body>
+</html>

@@ -1,0 +1,114 @@
+{
+    "_version": "1.65.0",
+    "sap.app": {
+        "id": "com.tecrise.bookshop.books",
+        "type": "application",
+        "title": "{{appTitle}}",
+        "description": "{{appDescription}}",
+        "applicationVersion": { "version": "1.0.0" },
+        "dataSources": {
+            "mainService": {
+                "uri": "/catalog/",
+                "type": "OData",
+                "settings": {
+                    "odataVersion": "4.0",
+                    "annotations": ["annotation0"]
+                }
+            },
+            "annotation0": {
+                "uri": "annotations/annotation0.xml",
+                "type": "ODataAnnotation"
+            }
+        }
+    },
+    "sap.ui": {
+        "technology": "UI5",
+        "icons": { "icon": "" },
+        "fullWidth": false,
+        "supportedThemes": ["sap_horizon", "sap_fiori_3"]
+    },
+    "sap.fiori": {
+        "registrationIds": [],
+        "archeType": "transactional"
+    },
+    "sap.ui5": {
+        "flexEnabled": true,
+        "dependencies": {
+            "minUI5Version": "1.120.0",
+            "libs": {
+                "sap.m": {},
+                "sap.ui.core": {},
+                "sap.ushell": {},
+                "sap.fe.templates": {}
+            }
+        },
+        "contentDensities": {
+            "compact": true,
+            "cozy": true
+        },
+        "models": {
+            "": {
+                "dataSource": "mainService",
+                "preload": true,
+                "settings": {
+                    "synchronizationMode": "None",
+                    "operationMode": "Server",
+                    "autoExpandSelect": true,
+                    "earlyRequests": true
+                }
+            },
+            "i18n": {
+                "type": "sap.ui.model.resource.ResourceModel",
+                "settings": {
+                    "bundleName": "com.tecrise.bookshop.books.i18n.i18n"
+                }
+            }
+        },
+        "routing": {
+            "config": {},
+            "routes": [
+                {
+                    "pattern": ":?query:",
+                    "name": "BooksList",
+                    "target": "BooksList"
+                },
+                {
+                    "pattern": "Books({key}):?query:",
+                    "name": "BooksObjectPage",
+                    "target": "BooksObjectPage"
+                }
+            ],
+            "targets": {
+                "BooksList": {
+                    "type": "Component",
+                    "id": "BooksList",
+                    "name": "sap.fe.templates.ListReport",
+                    "options": {
+                        "settings": {
+                            "entitySet": "Books",
+                            "initialLoad": true,
+                            "variantManagement": "None",
+                            "navigation": {
+                                "Books": {
+                                    "detail": {
+                                        "route": "BooksObjectPage"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "BooksObjectPage": {
+                    "type": "Component",
+                    "id": "BooksObjectPage",
+                    "name": "sap.fe.templates.ObjectPage",
+                    "options": {
+                        "settings": {
+                            "entitySet": "Books"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
