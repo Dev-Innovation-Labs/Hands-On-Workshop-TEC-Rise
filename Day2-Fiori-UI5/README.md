@@ -1,39 +1,75 @@
-# 📒 Hari 4: SAP Fiori & SAPUI5
+# 📒 Hari 2: SAP Fiori & SAPUI5 — Build UI dari CAP Service
 
+> **Author:** Wahyu Amaldi — Technical Lead SAP & Full Stack Development  
 > **Durasi:** 8 Jam (09:00 – 17:00)  
-> **Prasyarat:** Selesai Hari 3, OData service berjalan di localhost:4004
+> **Prasyarat:** Selesai Hari 1 (CAP project bookshop berjalan di localhost:4004)  
+> **BTP Trial:** Region ap21 (Singapore-Azure) | Org: 3220086dtrial | Space: dev
 
 ---
 
 ## 🎯 Learning Objectives
 
-Setelah menyelesaikan Hari 4, peserta mampu:
+Setelah menyelesaikan Hari 2, peserta mampu:
 - Memahami SAP Fiori Design Principles dan 5 Fiori Principles
-- Membedakan Fiori Elements vs Custom SAPUI5
-- Membuat Fiori Elements List Report & Object Page dari OData service
+- Membedakan Fiori Elements vs Custom SAPUI5 (Freestyle)
+- Membuat Fiori Elements List Report & Object Page dari CAP OData service
 - Menggunakan Fiori Annotations (UI, Common) untuk mengkonfigurasi tampilan
-- Menggunakan SAP Fiori tools di BAS
-- Menjalankan Fiori app di Fiori Launchpad (lokal)
+- Menggunakan SAP Fiori tools dan Yeoman generator (`yo @sap/fiori`)
+- Menjalankan Fiori app secara lokal di atas CAP server (`cds watch`)
 
 ---
 
-## 📅 Jadwal Hari 4
+## 📅 Jadwal Hari 2
 
 | Waktu | Sesi | Durasi |
 |-------|------|--------|
-| 09:00 – 09:15 | Recap Hari 3 | 15 menit |
+| 09:00 – 09:15 | Recap Hari 1 | 15 menit |
 | 09:15 – 10:30 | **Teori: Fiori Design & Arsitektur** | 75 menit |
 | 10:30 – 10:45 | Coffee Break | 15 menit |
 | 10:45 – 12:00 | **Hands-on: Generate Fiori App dengan Yeoman** | 75 menit |
 | 12:00 – 13:00 | Istirahat Makan Siang | 60 menit |
 | 13:00 – 14:30 | **Hands-on: Fiori Annotations & Customization** | 90 menit |
 | 14:30 – 14:45 | Coffee Break | 15 menit |
-| 14:45 – 16:30 | **Hands-on: Fiori Launchpad & Navigation** | 105 menit |
+| 14:45 – 16:30 | **Hands-on: Fiori Launchpad & Custom Views** | 105 menit |
 | 16:30 – 17:00 | Review, Q&A & Wrap-up | 30 menit |
 
 ---
 
 ## 📖 Materi Sesi 1: SAP Fiori Design
+
+### 💡 Penjelasan Sederhana & Analogi Dunia Nyata
+
+Banyak istilah baru di Hari 2. Mari kita pahami dulu sebelum mulai coding:
+
+> **🏠 SAP Fiori = Desain Interior Standar IKEA**
+>
+> Bayangkan Anda membangun rumah (aplikasi). Anda bisa:
+> - **Beli furniture IKEA** (Fiori Elements) — tinggal rakit pakai instruksi, hasilnya rapi dan standar
+> - **Buat furniture custom** (Freestyle SAPUI5) — desain sendiri, lebih fleksibel tapi butuh lebih banyak kerja
+>
+> | Istilah | Analogi | Penjelasan |
+> |:--------|:--------|:-----------|
+> | **SAP Fiori** | Standar desain IKEA | Panduan desain UI agar semua app SAP konsisten |
+> | **Fiori Elements** | Furniture IKEA (pre-built) | Template UI auto-generated dari annotations — minim coding |
+> | **Freestyle SAPUI5** | Furniture custom | UI ditulis manual dengan XML + JavaScript — full kontrol |
+> | **List Report** | Halaman katalog toko | Halaman tabel dengan filter & search — untuk browsing data |
+> | **Object Page** | Halaman detail produk | Halaman detail satu item — header, tabs, sections |
+> | **Annotations** | Label & instruksi di furniture | Metadata CDS yang mengontrol tampilan UI (kolom, filter, header) |
+> | **manifest.json** | Buku manual app | File config utama: data source, routing, model |
+> | **MVC** | Restoran | **Model**=Dapur (data), **View**=Menu (tampilan), **Controller**=Pelayan (logic) |
+> | **Yeoman Generator** | Mesin cetak furniture | Tool CLI yang generate scaffolding Fiori app otomatis |
+> | **OData Binding** | Pipa air ke dapur | Koneksi otomatis antara UI dan data backend |
+>
+> **Alur Fiori Elements:**
+> ```
+> CDS Model (Hari 1)
+>   → + Annotations (@UI.LineItem, @UI.HeaderInfo)
+>     → Fiori Elements Runtime membaca annotations
+>       → UI ter-generate otomatis! 🎨
+>
+> Anda TIDAK menulis HTML/XML untuk tabel, filter, form.
+> Cukup tulis annotations di CDS — UI langsung jadi.
+> ```
 
 ### SAP Fiori 5 Principles
 
@@ -96,11 +132,10 @@ Controller (.js)     ← Business logic
 ### Langkah 1: Install Fiori Generator
 
 ```bash
-# Di terminal BAS atau lokal
-npm install -g @sap/generator-fiori
-
-# Verifikasi
-yo @sap/fiori --version
+# Di terminal (tools sudah terinstall dari setup workshop)
+yo --version           # 7.0.0
+cds --version          # @sap/cds-dk 9.8.3
+node --version         # v24.11.0
 ```
 
 ### Langkah 2: Generate App via Yeoman
@@ -149,9 +184,29 @@ cd app/books
 npm start
 ```
 
+**✅ Hasil yang Diharapkan:**
+
+```
+[cds] - serving CatalogService { at: ['/odata/v4/catalog'] }
+[cds] - server listening on { url: 'http://localhost:4004' }
+```
+
+Buka browser:  
+- `http://localhost:4004` — CAP Welcome Page, klik link **"books"** untuk buka Fiori app
+- Anda akan melihat **List Report** dengan tabel Books (kolom Title, Author, Price, Stock)
+- Klik salah satu baris → **Object Page** terbuka dengan detail buku
+
+> **💡 Analogi:** Bayangkan Anda baru saja **merakit furniture IKEA**.
+> Tanpa menulis HTML/CSS apapun, Anda sudah punya halaman tabel dan halaman detail
+> yang tampilannya profesional — karena Fiori Elements yang generate-nya otomatis.
+
 ---
 
 ## 🛠️ Hands-on 2: Konfigurasi `manifest.json`
+
+> **💡 Analogi:** `manifest.json` adalah **buku manual** aplikasi Fiori Anda.
+> Di dalamnya tertulis: "data diambil dari mana" (dataSources), "halaman apa saja" (routes),
+> dan "bagaimana navigasinya" (targets). Tanpa file ini, app tidak tahu harus ngapain.
 
 ### File: `app/books/webapp/manifest.json`
 
@@ -241,6 +296,16 @@ npm start
 ---
 
 ## 🛠️ Hands-on 3: Fiori Annotations
+
+> **💡 Analogi:** Annotations itu seperti **label dan instruksi** di furniture IKEA.
+>
+> - `@UI.LineItem` = "Tampilkan kolom-kolom ini di halaman tabel"
+> - `@UI.HeaderInfo` = "Di halaman detail, tampilkan judul dan deskripsi ini"
+> - `@UI.Facets` = "Buat tab/section ini di halaman detail"
+> - `@Common.ValueList` = "Tampilkan dropdown pilihan dari data ini"
+>
+> Anda **tidak menulis HTML** — cukup tulis annotations di file `.cds`,
+> dan Fiori Elements otomatis generate UI-nya.
 
 ### File: `app/books/annotations.cds`
 
@@ -390,6 +455,16 @@ annotate service.Books with {
 ---
 
 ## 🛠️ Hands-on 4: Custom SAPUI5 View
+
+> **💡 Kapan pakai Freestyle vs Fiori Elements?**
+>
+> | Fiori Elements | Freestyle SAPUI5 |
+> |:---------------|:------------------|
+> | Butuh standar SAP (list, detail, form) | Butuh UI kustom yang unik |
+> | Minim coding, cepat development | Full kontrol, tapi butuh lebih banyak kode |
+> | Otomatis mengikuti SAP design guidelines | Desain bebas, harus maintain sendiri |
+>
+> Pada hands-on ini kita coba pendekatan **Freestyle** untuk memahami perbedaannya.
 
 ### File: `app/custom-books/webapp/view/BooksList.view.xml`
 
@@ -581,40 +656,53 @@ sap.ui.define([
 
 ---
 
-## 📝 Latihan Mandiri Hari 4
+## 📝 Latihan Mandiri Hari 2
 
-### Exercise 4.1: Tambah Column di List Report
-Tambahkan kolom `genre` di `UI.LineItem` annotation
+### Exercise 2.1: Tambah Column di List Report
+Tambahkan kolom `genre` dan `currency_code` di `UI.LineItem` annotation.
 
-### Exercise 4.2: Custom Filter
-Tambahkan filter bar untuk `price range` menggunakan `UI.SelectionFields`
+### Exercise 2.2: Custom Filter
+Tambahkan filter bar untuk `stock` dan `price` menggunakan `UI.SelectionFields`.
 
-### Exercise 4.3: Object Page Tab Baru
-Tambahkan tab "Reviews" di Object Page yang menampilkan related reviews menggunakan `UI.Facets`
+### Exercise 2.3: Object Page Tab Baru
+Tambahkan tab "Pricing" di Object Page yang menampilkan price, currency, stock.
 
-### Exercise 4.4: Value Help
-Implementasikan Value Help dropdown untuk field `genre` saat membuat/edit buku
+### Exercise 2.4: Value Help
+Implementasikan Value Help dropdown untuk field `author` menggunakan `@Common.ValueList`.
 
 ---
 
-## 🔑 Key Concepts Hari 4
+## 🔑 Key Concepts Hari 2
 
-| Konsep | Penjelasan |
-|--------|------------|
-| **Fiori Elements** | Framework UI declarative berbasis annotations |
-| **List Report** | Template halaman daftar dengan filter & table |
-| **Object Page** | Template halaman detail dengan header & sections |
-| **`UI.LineItem`** | Mendefinisikan kolom di tabel list |
-| **`UI.HeaderInfo`** | Mendefinisikan header di object page |
-| **`UI.Facets`** | Mendefinisikan tab/section di object page |
-| **Value Help** | Dropdown suggestion dari VH entity |
-| **SAPUI5 MVC** | Model-View-Controller pattern |
+| Konsep | Penjelasan | Analogi |
+|--------|------------|--------|
+| **Fiori Elements** | Framework UI declarative berbasis annotations | Furniture IKEA pre-built |
+| **List Report** | Template halaman tabel + filter + search | Halaman katalog toko online |
+| **Object Page** | Template halaman detail dengan header & sections | Halaman detail produk |
+| **`UI.LineItem`** | Mendefinisikan kolom di tabel | Memilih kolom di spreadsheet |
+| **`UI.HeaderInfo`** | Mendefinisikan header di object page | Judul & subtitle di kartu nama |
+| **`UI.Facets`** | Mendefinisikan tab/section di object page | Tab di browser |
+| **Value Help** | Dropdown suggestion dari entity lain | Autocomplete di Google search |
+| **SAPUI5 MVC** | Model-View-Controller pattern | Restoran: Dapur-Menu-Pelayan |
+| **manifest.json** | App descriptor / konfigurasi utama | Buku manual elektronik |
+
+---
+
+## 📂 Hasil Hands-on
+
+Semua hasil hands-on dan exercise didokumentasikan di folder **[handson/](./handson/)**:
+
+| Dokumen | Deskripsi |
+|---------|----------|
+| [Hands-on 1: Fiori App Generation](./handson/handson-1-fiori-app-generation.md) | Generate & jalankan Fiori Elements app dari CAP |
+| [Hands-on 2: Manifest & Routing](./handson/handson-2-manifest-routing.md) | Konfigurasi manifest.json dan verifikasi routing |
+| [Hands-on 3: Fiori Annotations](./handson/handson-3-fiori-annotations.md) | CDS annotations dan hasil UI yang ter-generate |
+| [Hands-on 4: Custom SAPUI5 View](./handson/handson-4-custom-sapui5.md) | Freestyle SAPUI5 view dengan MVC pattern |
+| [Hands-on 5: Fiori Launchpad](./handson/handson-5-fiori-launchpad.md) | Konfigurasi FLP sandbox lokal |
 
 ---
 
 ## 📚 Referensi
-
-- [SAP Fiori Design Guidelines](https://experience.sap.com/fiori-design-web/)
 - [Fiori Elements Documentation](https://ui5.sap.com/#/topic/03265b0408e2432c9571d6b3feb6b1fd)
 - [SAPUI5 SDK](https://ui5.sap.com/)
 - [Fiori Annotations Reference](https://cap.cloud.sap/docs/advanced/fiori)
@@ -622,5 +710,10 @@ Implementasikan Value Help dropdown untuk field `genre` saat membuat/edit buku
 
 ---
 
-⬅️ **Prev:** [Hari 3 — OData Services](../Day3-OData-Services/README.md)  
-➡️ **Next:** [Hari 5 — Integration & Deployment](../Day5-Integration-Deployment/README.md)
+⬅️ **Prev:** [Hari 1 — BTP Fundamentals](../Day1-BTP-Fundamentals/README.md)  
+➡️ **Next:** [Hari 3 — Extensibility](../Day3-Extensibility/README.md)  
+🏠 **Home:** [Workshop Overview](../README.md)
+
+---
+
+<sub>**Workshop Material by Wahyu Amaldi** — Technical Lead SAP & Full Stack Development | SAP Certified — BTP, ABAP, Fiori, BDC</sub>

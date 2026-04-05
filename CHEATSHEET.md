@@ -1,5 +1,7 @@
 # 📋 SAP CAP / CDS / OData / Fiori — Quick Reference Cheatsheet
 
+> **Author:** Wahyu Amaldi — Technical Lead SAP & Full Stack Development | SAP Certified — BTP, ABAP, Fiori, BDC
+
 ## CDS Language
 
 ```cds
@@ -205,3 +207,7 @@ user.attr.MyAttr        // → custom attribute
     }]
 }
 ```
+
+---
+
+<sub>**Workshop Material by Wahyu Amaldi** — Technical Lead SAP & Full Stack Development | SAP Certified — BTP, ABAP, Fiori, BDC</sub>
