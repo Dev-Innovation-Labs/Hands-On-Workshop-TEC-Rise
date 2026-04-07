@@ -4,6 +4,9 @@
 
 Folder ini berisi dokumentasi bukti bahwa setiap hands-on di Hari 3 telah dijalankan dan berhasil.
 
+> **🔍 Divalidasi terhadap data real** dari sistem SAP S/4HANA di `sap.ilmuprogram.com`
+> (Client 777, Company Code 1710 — Andi Coffee, Plant 1710 — Coffee Plant Jakarta).
+
 ## Skenario Bisnis
 
 Membangun **Custom Purchase Order System** di BTP sebagai **side-by-side extension** (pengganti Z-table di S/4HANA), meliputi:

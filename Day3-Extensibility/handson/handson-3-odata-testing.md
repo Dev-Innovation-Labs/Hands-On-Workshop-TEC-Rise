@@ -752,3 +752,111 @@ Step 8: CHECK FIORI LIST
 - ✅ **Auto-calculation** net amount dan total amount berfungsi
 - ✅ **Status management** dengan 4 actions + validasi + audit trail lengkap
 - ✅ **REST Client test file** tersedia untuk testing semua endpoint
+
+---
+
+## 🔍 Bonus: Perbandingan OData — Workshop CAP vs S/4HANA Real
+
+> Sesi ini menunjukkan bahwa OData query yang kita jalankan di CAP **memiliki pola yang sama**
+> dengan query ke sistem S/4HANA real di `sap.ilmuprogram.com`.
+
+### Side-by-Side OData Query Comparison
+
+| Operasi | CAP (localhost:4004) | S/4HANA Real (sap.ilmuprogram.com) |
+|:--------|:--------------------|:----------------------------------|
+| **List PO** | `GET /odata/v4/po/PurchaseOrders` | `GET /sap/opu/odata/sap/C_PURCHASEORDER_FS_SRV/C_PurchaseOrderFs` |
+| **PO Detail** | `GET /odata/v4/po/PurchaseOrders('uuid')` | `GET .../C_PurchaseOrderFs('4500000015')` |
+| **PO Items** | `?$expand=items` | `.../C_PurchaseOrderFs('4500000015')/to_PurchaseOrderItem` |
+| **Supplier** | `?$expand=supplier` | `.../C_PurchaseOrderFs('4500000015')/to_InvoicingParty` |
+| **Filter** | `?$filter=status eq 'D'` | `?$filter=PurchasingDocumentStatus eq '03'` |
+| **Select** | `?$select=poNumber,totalAmount` | `?$select=PurchaseOrder,PurchaseOrderNetAmount` |
+| **Top/Skip** | `?$top=5&$skip=10` | `?$top=5&$skip=10` |
+| **Format** | Default JSON (OData V4) | `?$format=json` (OData V2) |
+| **Metadata** | `GET /odata/v4/po/$metadata` | `GET .../C_PURCHASEORDER_FS_SRV/$metadata` |
+
+### Response Comparison: CAP vs S/4HANA Real
+
+**CAP Response (workshop):**
+```json
+{
+  "poNumber": "PO-240001",
+  "description": "Pengadaan Spare Parts Q1",
+  "status": "P",
+  "totalAmount": 1295000,
+  "supplier": { "name": "PT Baja Nusantara" },
+  "items": [
+    { "itemNo": 10, "description": "Bearing SKF 6205", "quantity": 5, "netAmount": 625000 }
+  ]
+}
+```
+
+**S/4HANA Real Response:**
+```json
+{
+  "PurchaseOrder": "4500000015",
+  "PurchaseOrder_Text": "Standard PO",
+  "PurchasingDocumentStatus": "03",
+  "PurchaseOrderNetAmount": "3020.00",
+  "SupplierName": "Domestic US JV Partner 1",
+
+  "ZZ1_RefExtIDWahyu2_PDH": "",
+  "ZZ1_ref_external_h01_PDH": "",
+  "ZZ1_RefExtIDVidetra_PDH": "0.00"
+}
+```
+
+**Perbedaan kunci:**
+| Aspek | CAP (OData V4) | S/4HANA (OData V2) |
+|:------|:---------------|:-------------------|
+| Protocol | OData V4 | OData V2 |
+| Naming | camelCase (`poNumber`) | PascalCase (`PurchaseOrder`) |
+| Navigation | `$expand=items` | `/to_PurchaseOrderItem` |
+| Result wrapper | `{ "value": [...] }` | `{ "d": { "results": [...] } }` |
+| Key format | UUID | 10-digit string |
+| Auth | None (dev) / JWT | Basic Auth + SAP Client |
+| Custom fields | New entity/field | ZZ1_ prefix in-line |
+
+### Real OData Services Discovery
+
+Dari **2.178 services** yang aktif di sap.ilmuprogram.com, procurement-related services:
+
+```
+Procurement OData Services Tersedia:
+═══════════════════════════════════════════════════════════
+
+📋 Purchase Order
+├── C_PURCHASEORDER_FS_SRV         → PO Fiori List/Detail (BISA DIAKSES ✅)
+├── MM_PUR_PO_MAINT_V2_SRV        → PO Maintenance
+├── MM_PUR_POITEMS_MONI_SRV       → PO Items Monitor
+├── MM_PUR_PO_HISTORY_SRV         → PO Change History
+├── MM_PUR_POMASS_UPDATE_SRV      → PO Mass Update
+├── C_CNTRLPURCHASEORDER_FS_SRV   → Central PO
+└── SIMPLE_INB_PO_SRV             → Simple Inbound PO
+
+👤 Supplier Master
+├── MD_SUPPLIER_MASTER_SRV         → Full Supplier Master (BISA DIAKSES ✅)
+├── C_SUPPLIER_FS_SRV              → Supplier Analytics (BISA DIAKSES ✅)
+├── FAP_DISPLAY_SUPPLIER_LIST      → Supplier Display
+├── MM_SUPPLIER_INVOICE_MANAGE     → Supplier Invoice
+└── UI_SUPPLIERLIST_MANAGE         → Supplier List Management
+
+📦 Material / Inventory
+├── MMIM_MATERIAL_DATA_SRV         → Material Headers (BISA DIAKSES ✅)
+├── MMIM_MULTIPLE_MATERIAL_SRV     → Multi-Material View
+├── MM_IM_PHYS_INV_DOC_SRV        → Physical Inventory
+└── UI_STOCKREPORTING_O2           → Stock Reporting
+
+📄 Purchase Requisition
+├── MM_PUR_PR_PROCESS_SRV          → PR Processing
+├── MM_PUR_PRITEM_MNTR_SRV        → PR Item Monitor
+├── MM_PUR_REQ_HISTORY_SRV        → PR History
+└── MM_PUR_REQ_APPROVAL_COMPLETION_SRV → PR Approval
+
+⚠️  CATATAN: Standard API Hub services (API_PURCHASEORDER_PROCESS_SRV,
+    API_BUSINESS_PARTNER, API_PRODUCT_SRV) BELUM diaktifkan di sistem ini.
+    Yang aktif adalah Fiori OData services (C_, MM_PUR_, MD_ prefix).
+```
+
+> **Takeaway untuk peserta:** OData skills yang Anda pelajari di workshop (query, filter,
+> expand, select, metadata) **100% transferable** ke S/4HANA real. Yang berubah hanya
+> naming convention dan URL pattern — fundamental-nya sama.

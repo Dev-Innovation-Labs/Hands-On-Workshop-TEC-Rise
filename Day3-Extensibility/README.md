@@ -406,6 +406,156 @@ Production Architecture (FYI):
 
 ---
 
+### 🔍 7. Bukti Clean Core di Sistem Real: sap.ilmuprogram.com
+
+> **💡 Sesi ini menunjukkan data REAL dari sistem SAP S/4HANA** untuk membuktikan bahwa
+> konsep yang kita pelajari align dengan sistem production sesungguhnya.
+
+#### 🌐 Sistem Yang Digunakan
+
+| Parameter | Nilai |
+|:----------|:------|
+| **Hostname** | `sap.ilmuprogram.com` |
+| **Client** | `777` |
+| **Company Code** | `1710` — **Andi Coffee** |
+| **Plant** | `1710` — **Coffee Plant – Jakarta** |
+| **Purchasing Org** | `1710` — Purch. Org. 1710 |
+| **Total OData Services** | **2.178 services** aktif |
+
+#### 📊 Data Purchase Order Real (16 PO)
+
+```
+Data yang di-query dari: C_PURCHASEORDER_FS_SRV/C_PurchaseOrderFs
+═══════════════════════════════════════════════════════════════════
+
+          PO |         Type |                                 Supplier |   Amount |  Status              | Created By
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  4500000000 |  Standard PO |         Wahyu Amaldi (Domestic Supplier) | $3,020   |  Follow-On Documents |  BUDILUHUR
+  4500000003 |  Standard PO |         Wahyu Amaldi (Domestic Supplier) |   $500   |  Follow-On Documents |    LINTANG
+  4500000007 |  Standard PO |                   Domestic US Supplier 2 |   $900   |  Follow-On Documents |    LINTANG
+  4500000010 |  Standard PO |         Wahyu Amaldi (Domestic Supplier) | $30,020  |  Follow-On Documents | BUDILUHUR2
+  4500000011 |  Standard PO |                            (no supplier) |     $0   |  Draft               | BUDILUHUR2
+  4500000014 |  Standard PO |         Wahyu Amaldi (Domestic Supplier) |  $3,020  |  Draft               | BUDILUHUR2
+  4500000015 |  Standard PO |                Domestic US JV Partner 1  |  $3,020  |  Not Yet Sent        | WAHYU.AMALDI
+```
+
+#### 🏭 Detail PO 4500000015 (Dibuat oleh WAHYU.AMALDI)
+
+```
+PO Header:
+  PurchaseOrder          : 4500000015
+  PurchaseOrderType      : NB (Standard PO)
+  CompanyCode            : 1710 (Andi Coffee)
+  Supplier               : 17258002 — Domestic US JV Partner 1
+  PaymentTerms           : 0001 — Pay Immediately w/o Deduction
+  PurchaseOrderNetAmount : $3,020.00
+  Status                 : Not Yet Sent (03)
+
+PO Item 00010:
+  PurchaseOrderItemText  : Pembelian
+  MaterialGroup          : YBFA12 — Office Equipment
+  OrderQuantity          : 10 PC
+  NetPriceAmount         : $302.00
+  NetAmount              : $3,020.00
+  Plant                  : 1710 — Coffee Plant – Jakarta
+  AccountAssignment      : Asset (A)
+
+  ⚡ ZZ1 Custom Extension Fields (Clean Core In-App Extension):
+  ZZ1_RefExtIDWahyu2_PDH     → Custom field (String)
+  ZZ1_ref_external_h01_PDH   → Custom field (String)
+  ZZ1_RefExtIDVidetra_PDH    → Custom field (Decimal) = 0.00
+```
+
+#### 🔑 Temuan Kunci: **Dua Tipe Clean Core Extension**
+
+```
+╔══════════════════════════════════════════════════════════════════════════╗
+║  BUKTI CLEAN CORE BERJALAN DI SISTEM REAL                               ║
+╠══════════════════════════════════════════════════════════════════════════╣
+║                                                                          ║
+║  1️⃣  IN-APP EXTENSION (di dalam S/4HANA)                                ║
+║     • ZZ1_ prefix fields di PO header                                    ║
+║     • Dibuat via Key User Tools / Custom Fields & Logic app              ║
+║     • Contoh: ZZ1_RefExtIDWahyu2_PDH, ZZ1_ref_external_h01_PDH         ║
+║     • Data tersimpan di S/4HANA (extend standard table EKKO)            ║
+║     • ✅ Clean Core compliant — menggunakan extension API resmi         ║
+║                                                                          ║
+║  2️⃣  SIDE-BY-SIDE EXTENSION (di BTP) ← YANG KITA BANGUN HARI INI      ║
+║     • Custom entities di CAP (PurchaseOrders, Items, Suppliers, dll)    ║
+║     • Data tersimpan di BTP (HANA Cloud / SQLite)                       ║
+║     • Terhubung ke S/4HANA via Destination + OData API                  ║
+║     • Contoh: PO Tracking, Vendor Rating, Custom Approval Workflow      ║
+║     • ✅ Clean Core compliant — tidak menyentuh S/4HANA core            ║
+║                                                                          ║
+║  KEDUANYA SALING MELENGKAPI:                                             ║
+║  ┌─────────────────────────┐    ┌──────────────────────────────────┐    ║
+║  │ In-App Extension        │    │ Side-by-Side Extension (BTP)     │    ║
+║  │ • Tambah field ke PO    │◄──►│ • Custom tables & logic          │    ║
+║  │ • ZZ1_ custom fields    │API │ • Custom Fiori UI                │    ║
+║  │ • Custom BAdI logic     │    │ • Custom workflow & reporting    │    ║
+║  └─────────────────────────┘    └──────────────────────────────────┘    ║
+╚══════════════════════════════════════════════════════════════════════════╝
+```
+
+#### 📋 Suppliers Real di Sistem SAP
+
+| Supplier ID | Nama | Country | Account Group |
+|:------------|:-----|:--------|:-------------|
+| `17300001` | **Wahyu Amaldi (Domestic Supplier)** | 🇮🇩 ID | SUPL |
+| `17300002` | Domestic US Supplier 2 | 🇺🇸 US | SUPL |
+| `17258001` | JV Operator US | 🇺🇸 US | SUPL |
+| `17258002` | Domestic US JV Partner 1 | 🇺🇸 US | SUPL |
+| `17154801` | JIT Company | 🇺🇸 US | SUPL |
+| `17300003` | Domestic US Supplier 3 (with ERS) | 🇺🇸 US | SUPL |
+| `17300007` | Domestic US Subcontractor A | 🇺🇸 US | SUPL |
+
+#### 📦 Materials Real (dari C_MM_MaterialValueHelp)
+
+| Material ID | Deskripsi | Group | Type | UoM |
+|:------------|:----------|:------|:-----|:----|
+| `EWMS4-50` | FIN50, Fast Moving | L004 | FERT | - |
+| `FG1_CP` | Shaft with Rolling Bearings | L004 | FERT | - |
+| `AVC_RBT_ROBOT` | Robot Base Unit | L004 | KMAT | - |
+| `CM-FL-V00` | Forklift | L004 | KMAT | - |
+| `EWMS4-01` | Small Part, Slow-Moving Item | L001 | HAWA | - |
+| `CSSRV_01` | Service | P001 | SERV | - |
+
+#### 🔗 OData Services Aktif untuk Procurement
+
+| Service | URL | Fungsi |
+|:--------|:----|:-------|
+| `C_PURCHASEORDER_FS_SRV` | `/sap/opu/odata/sap/C_PURCHASEORDER_FS_SRV` | PO Fiori (List/Detail) |
+| `MD_SUPPLIER_MASTER_SRV` | `/sap/opu/odata/sap/MD_SUPPLIER_MASTER_SRV` | Supplier Master |
+| `MMIM_MATERIAL_DATA_SRV` | `/sap/opu/odata/sap/MMIM_MATERIAL_DATA_SRV` | Material Data |
+| `C_SUPPLIER_FS_SRV` | `/sap/opu/odata/sap/C_SUPPLIER_FS_SRV` | Supplier Analytics |
+| `MM_PUR_PO_HISTORY_SRV` | (registered) | PO History |
+| `MM_PUR_POITEMS_MONI_SRV` | (registered) | PO Items Monitor |
+
+> **⚠️ Catatan:** Standard API Hub services (`API_PURCHASEORDER_PROCESS_SRV`, `API_BUSINESS_PARTNER`,
+> `API_PRODUCT_SRV`) **belum diaktifkan** di sistem ini. Yang aktif adalah Fiori OData services
+> dengan prefix `C_` (consumption) dan `MM_PUR_` (purchasing apps). Ini umum di sistem S/4HANA
+> yang fokus pada Fiori apps daripada headless API integration.
+
+#### 📐 Mapping Validasi: CAP Workshop vs Real S/4HANA
+
+| Aspek | Workshop (CAP Entity) | Real System (S/4HANA OData) | Alignment |
+|:------|:---------------------|:---------------------------|:----------|
+| PO Header | `PurchaseOrders` | `C_PurchaseOrderFs` (EKKO) | ✅ Match |
+| PO Item | `PurchaseOrderItems` | `to_PurchaseOrderItem` (EKPO) | ✅ Match |
+| Supplier | `Suppliers` entity | `I_Supplier` / `C_MM_SupplierValueHelp` | ✅ Match |
+| Material | `Materials` entity | `I_Material` / `C_MM_MaterialValueHelp` | ✅ Match |
+| Status Flow | Draft→Open→Posted→Approved | Draft→Not Yet Sent→Follow-On Docs | ✅ Similar |
+| Custom Fields | CAP entity = tabel baru | ZZ1_ prefix = In-App Extension | ✅ Complementary |
+| PO Number | `PO-YYXXXX` auto | `4500000000` sequential (10 digit) | ✅ Pattern sama |
+| Item Number | `10, 20, 30...` | `00010, 00020...` (5 digit) | ✅ Pattern sama |
+| Extension Type | **Side-by-Side** (BTP) | **In-App** (ZZ1 fields) | ✅ Both Clean Core |
+
+> **Kesimpulan:** Data model yang kita bangun di workshop **align dengan struktur Purchase Order
+> di S/4HANA real**. Peserta yang mengerjakan workshop ini akan memiliki pemahaman yang langsung
+> applicable ke project S/4HANA nyata.
+
+---
+
 ## 🛠️ Hands-on 1: Data Model Purchase Order (Pengganti Z-table)
 
 > **💡 Inti Hands-on 1:** Kita membangun 4 entity yang menjadi **pengganti Z-table**:
@@ -525,49 +675,57 @@ entity POStatusHistory : cuid, managed {
 
 ```csv
 ID;supplierNo;name;address;city;country;phone;email;isActive
-f47ac10b-58cc-4372-a567-0e02b2c3d479;SUP-001;PT Baja Nusantara;Jl. Industri No. 45;Cikarang;ID;+62-21-8900123;baja@nusantara.co.id;true
+f47ac10b-58cc-4372-a567-0e02b2c3d479;SUP-001;PT Andi Coffee Supply;Jl. Industri No. 45;Cikarang;ID;+62-21-8900123;supply@andicoffee.co.id;true
 550e8400-e29b-41d4-a716-446655440001;SUP-002;CV Mitra Logistik;Jl. Pelabuhan Raya 12;Surabaya;ID;+62-31-5551234;info@mitralogistik.id;true
-550e8400-e29b-41d4-a716-446655440002;SUP-003;PT Kimia Farma Supply;Jl. Veteran No. 10;Jakarta;ID;+62-21-3841234;supply@kimiafarma.co.id;true
+550e8400-e29b-41d4-a716-446655440002;SUP-003;PT Wahyu Amaldi Trading;Jl. Raya Karawaci 88;Karawachi;ID;+62-21-3841234;wahyu@trading.co.id;true
 550e8400-e29b-41d4-a716-446655440003;SUP-004;UD Sumber Makmur;Jl. Pasar Baru 88;Semarang;ID;+62-24-3551122;sumber@makmur.co.id;true
 550e8400-e29b-41d4-a716-446655440004;SUP-005;PT Global Parts Indonesia;Jl. Gatot Subroto Kav. 21;Jakarta;ID;+62-21-5201888;order@globalparts.co.id;true
 ```
+
+> **Referensi S/4HANA Real:** SUP-001 ↔ Company 1710 (Andi Coffee), SUP-003 ↔ Supplier 17300001 (Wahyu Amaldi, Karawachi, ID)
 
 **File: `db/data/com.tecrise.procurement-Materials.csv`**
 
 ```csv
 ID;materialNo;description;category;uom;unitPrice;currency_code;isActive
-a1b2c3d4-e5f6-7890-abcd-ef1234567001;MAT-10001;Bearing SKF 6205;Spare Parts;PC;125000.00;IDR;true
+a1b2c3d4-e5f6-7890-abcd-ef1234567001;MAT-10001;Laptop Business 14 inch;Office Equipment;PC;4850000.00;IDR;true
 a1b2c3d4-e5f6-7890-abcd-ef1234567002;MAT-10002;Hydraulic Oil ISO 46 (20L);Lubricants;L;450000.00;IDR;true
-a1b2c3d4-e5f6-7890-abcd-ef1234567003;MAT-10003;V-Belt Type B68;Spare Parts;PC;85000.00;IDR;true
+a1b2c3d4-e5f6-7890-abcd-ef1234567003;MAT-10003;Coffee Bean Arabica Toraja (1Kg);Raw Materials;KG;285000.00;IDR;true
 a1b2c3d4-e5f6-7890-abcd-ef1234567004;MAT-10004;Safety Helmet (Yellow);Safety;PC;75000.00;IDR;true
-a1b2c3d4-e5f6-7890-abcd-ef1234567005;MAT-10005;Welding Rod E6013 (5Kg);Consumables;KG;95000.00;IDR;true
+a1b2c3d4-e5f6-7890-abcd-ef1234567005;MAT-10005;Coffee Roasting Machine Part;Spare Parts;PC;1950000.00;IDR;true
 a1b2c3d4-e5f6-7890-abcd-ef1234567006;MAT-10006;Pipa Besi 2" Sch 40 (6M);Raw Materials;M;320000.00;IDR;true
 a1b2c3d4-e5f6-7890-abcd-ef1234567007;MAT-10007;Kabel NYY 4x10mm² (per M);Electrical;M;185000.00;IDR;true
 a1b2c3d4-e5f6-7890-abcd-ef1234567008;MAT-10008;Glove Latex Industrial;Safety;BOX;45000.00;IDR;true
 ```
 
+> **Referensi S/4HANA Real:** MAT-10001 (Laptop) ↔ PO Item "Laptop" di PO 4500000000 ($302/PC),
+> MAT Group YBFA12 = Office Equipment. Company Andi Coffee → coffee materials ditambahkan.
+
 **File: `db/data/com.tecrise.procurement-PurchaseOrders.csv`**
 
 ```csv
 ID;poNumber;description;supplier_ID;status;orderDate;deliveryDate;totalAmount;currency_code;notes
-b1c2d3e4-f5a6-7890-bcde-f12345670001;PO-240001;Pengadaan Spare Parts Q1;f47ac10b-58cc-4372-a567-0e02b2c3d479;P;2024-01-15;2024-02-15;1295000.00;IDR;Urgent untuk maintenance shutdown
-b1c2d3e4-f5a6-7890-bcde-f12345670002;PO-240002;Pembelian Safety Equipment;550e8400-e29b-41d4-a716-446655440003;A;2024-02-01;2024-02-28;570000.00;IDR;Untuk tim lapangan baru
-b1c2d3e4-f5a6-7890-bcde-f12345670003;PO-240003;Restock Lubricants Pabrik 2;550e8400-e29b-41d4-a716-446655440001;O;2024-03-10;2024-04-10;1800000.00;IDR;
+b1c2d3e4-f5a6-7890-bcde-f12345670001;PO-240001;Pengadaan Laptop Kantor Jakarta;f47ac10b-58cc-4372-a567-0e02b2c3d479;P;2024-01-15;2024-02-15;48500000.00;IDR;Untuk tim operasional Coffee Plant Jakarta
+b1c2d3e4-f5a6-7890-bcde-f12345670002;PO-240002;Pembelian Safety Equipment;550e8400-e29b-41d4-a716-446655440003;A;2024-02-01;2024-02-28;570000.00;IDR;Untuk tim lapangan roasting plant
+b1c2d3e4-f5a6-7890-bcde-f12345670003;PO-240003;Restock Coffee Bean Toraja;550e8400-e29b-41d4-a716-446655440001;O;2024-03-10;2024-04-10;2850000.00;IDR;Bahan baku Q2
 b1c2d3e4-f5a6-7890-bcde-f12345670004;PO-240004;Pengadaan Electrical Cable;550e8400-e29b-41d4-a716-446655440004;D;2024-03-20;2024-04-20;0.00;IDR;Draft - belum lengkap
 ```
+
+> **Referensi S/4HANA Real:** PO-240001 mirip PO 4500000000 (Laptop, $3,020, Follow-On Documents).
+> Status mapping: Posted (P) = Follow-On Documents (05), Draft (D) = Draft status di real system.
 
 **File: `db/data/com.tecrise.procurement-PurchaseOrderItems.csv`**
 
 ```csv
 ID;parent_ID;itemNo;material_ID;description;quantity;uom;unitPrice;netAmount;currency_code
-c1d2e3f4-a5b6-7890-cdef-012345670001;b1c2d3e4-f5a6-7890-bcde-f12345670001;10;a1b2c3d4-e5f6-7890-abcd-ef1234567001;Bearing SKF 6205;5;PC;125000.00;625000.00;IDR
-c1d2e3f4-a5b6-7890-cdef-012345670002;b1c2d3e4-f5a6-7890-bcde-f12345670001;20;a1b2c3d4-e5f6-7890-abcd-ef1234567003;V-Belt Type B68;4;PC;85000.00;340000.00;IDR
-c1d2e3f4-a5b6-7890-cdef-012345670003;b1c2d3e4-f5a6-7890-bcde-f12345670001;30;a1b2c3d4-e5f6-7890-abcd-ef1234567005;Welding Rod E6013 (5Kg);2;KG;95000.00;190000.00;IDR
-c1d2e3f4-a5b6-7890-cdef-012345670004;b1c2d3e4-f5a6-7890-bcde-f12345670001;40;a1b2c3d4-e5f6-7890-abcd-ef1234567008;Glove Latex Industrial;3;BOX;45000.00;135000.00;IDR
+c1d2e3f4-a5b6-7890-cdef-012345670001;b1c2d3e4-f5a6-7890-bcde-f12345670001;10;a1b2c3d4-e5f6-7890-abcd-ef1234567001;Laptop Business 14 inch;10;PC;4850000.00;48500000.00;IDR
 c1d2e3f4-a5b6-7890-cdef-012345670005;b1c2d3e4-f5a6-7890-bcde-f12345670002;10;a1b2c3d4-e5f6-7890-abcd-ef1234567004;Safety Helmet (Yellow);4;PC;75000.00;300000.00;IDR
 c1d2e3f4-a5b6-7890-cdef-012345670006;b1c2d3e4-f5a6-7890-bcde-f12345670002;20;a1b2c3d4-e5f6-7890-abcd-ef1234567008;Glove Latex Industrial;6;BOX;45000.00;270000.00;IDR
-c1d2e3f4-a5b6-7890-cdef-012345670007;b1c2d3e4-f5a6-7890-bcde-f12345670003;10;a1b2c3d4-e5f6-7890-abcd-ef1234567002;Hydraulic Oil ISO 46 (20L);4;L;450000.00;1800000.00;IDR
+c1d2e3f4-a5b6-7890-cdef-012345670007;b1c2d3e4-f5a6-7890-bcde-f12345670003;10;a1b2c3d4-e5f6-7890-abcd-ef1234567003;Coffee Bean Arabica Toraja (1Kg);10;KG;285000.00;2850000.00;IDR
 ```
+
+> **Referensi S/4HANA Real:** Item 00010 di PO 4500000000 = "Laptop", Qty 10 PC, Net $3,020.
+> Pattern item numbering 10, 20, 30... sama dengan S/4HANA real (00010, 00020...).
 
 ### Langkah 3: Verifikasi Model
 
@@ -580,7 +738,7 @@ cds watch
 
 Buka `http://localhost:4004` — entity baru muncul di welcome page:
 - `PurchaseOrders` (4 records)
-- `PurchaseOrderItems` (7 records)
+- `PurchaseOrderItems` (4 records)
 - `Suppliers` (5 records)
 - `Materials` (8 records)
 

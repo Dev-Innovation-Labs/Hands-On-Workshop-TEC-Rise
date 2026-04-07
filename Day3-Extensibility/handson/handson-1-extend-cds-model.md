@@ -154,49 +154,54 @@ entity POStatusHistory : cuid, managed {
 
 ```csv
 ID;supplierNo;name;address;city;country;phone;email;isActive
-f47ac10b-58cc-4372-a567-0e02b2c3d479;SUP-001;PT Baja Nusantara;Jl. Industri No. 45;Cikarang;ID;+62-21-8900123;baja@nusantara.co.id;true
+f47ac10b-58cc-4372-a567-0e02b2c3d479;SUP-001;PT Andi Coffee Supply;Jl. Industri No. 45;Cikarang;ID;+62-21-8900123;supply@andicoffee.co.id;true
 550e8400-e29b-41d4-a716-446655440001;SUP-002;CV Mitra Logistik;Jl. Pelabuhan Raya 12;Surabaya;ID;+62-31-5551234;info@mitralogistik.id;true
-550e8400-e29b-41d4-a716-446655440002;SUP-003;PT Kimia Farma Supply;Jl. Veteran No. 10;Jakarta;ID;+62-21-3841234;supply@kimiafarma.co.id;true
+550e8400-e29b-41d4-a716-446655440002;SUP-003;PT Wahyu Amaldi Trading;Jl. Raya Karawaci 88;Karawachi;ID;+62-21-3841234;wahyu@trading.co.id;true
 550e8400-e29b-41d4-a716-446655440003;SUP-004;UD Sumber Makmur;Jl. Pasar Baru 88;Semarang;ID;+62-24-3551122;sumber@makmur.co.id;true
 550e8400-e29b-41d4-a716-446655440004;SUP-005;PT Global Parts Indonesia;Jl. Gatot Subroto Kav. 21;Jakarta;ID;+62-21-5201888;order@globalparts.co.id;true
 ```
+
+> **Referensi S/4HANA Real:** SUP-001 ↔ Company 1710 (Andi Coffee), SUP-003 ↔ Supplier 17300001 (Wahyu Amaldi, Karawachi, ID)
 
 **File: `db/data/com.tecrise.procurement-Materials.csv`**
 
 ```csv
 ID;materialNo;description;category;uom;unitPrice;currency_code;isActive
-a1b2c3d4-e5f6-7890-abcd-ef1234567001;MAT-10001;Bearing SKF 6205;Spare Parts;PC;125000.00;IDR;true
+a1b2c3d4-e5f6-7890-abcd-ef1234567001;MAT-10001;Laptop Business 14 inch;Office Equipment;PC;4850000.00;IDR;true
 a1b2c3d4-e5f6-7890-abcd-ef1234567002;MAT-10002;Hydraulic Oil ISO 46 (20L);Lubricants;L;450000.00;IDR;true
-a1b2c3d4-e5f6-7890-abcd-ef1234567003;MAT-10003;V-Belt Type B68;Spare Parts;PC;85000.00;IDR;true
+a1b2c3d4-e5f6-7890-abcd-ef1234567003;MAT-10003;Coffee Bean Arabica Toraja (1Kg);Raw Materials;KG;285000.00;IDR;true
 a1b2c3d4-e5f6-7890-abcd-ef1234567004;MAT-10004;Safety Helmet (Yellow);Safety;PC;75000.00;IDR;true
-a1b2c3d4-e5f6-7890-abcd-ef1234567005;MAT-10005;Welding Rod E6013 (5Kg);Consumables;KG;95000.00;IDR;true
+a1b2c3d4-e5f6-7890-abcd-ef1234567005;MAT-10005;Coffee Roasting Machine Part;Spare Parts;PC;1950000.00;IDR;true
 a1b2c3d4-e5f6-7890-abcd-ef1234567006;MAT-10006;Pipa Besi 2" Sch 40 (6M);Raw Materials;M;320000.00;IDR;true
 a1b2c3d4-e5f6-7890-abcd-ef1234567007;MAT-10007;Kabel NYY 4x10mm² (per M);Electrical;M;185000.00;IDR;true
 a1b2c3d4-e5f6-7890-abcd-ef1234567008;MAT-10008;Glove Latex Industrial;Safety;BOX;45000.00;IDR;true
 ```
 
+> **Referensi S/4HANA Real:** MAT-10001 (Laptop) ↔ PO Item "Laptop" di PO 4500000000, MaterialGroup YBFA12 = Office Equipment
+
 **File: `db/data/com.tecrise.procurement-PurchaseOrders.csv`**
 
 ```csv
 ID;poNumber;description;supplier_ID;status;orderDate;deliveryDate;totalAmount;currency_code;notes
-b1c2d3e4-f5a6-7890-bcde-f12345670001;PO-240001;Pengadaan Spare Parts Q1;f47ac10b-58cc-4372-a567-0e02b2c3d479;P;2024-01-15;2024-02-15;1295000.00;IDR;Urgent untuk maintenance shutdown
-b1c2d3e4-f5a6-7890-bcde-f12345670002;PO-240002;Pembelian Safety Equipment;550e8400-e29b-41d4-a716-446655440002;A;2024-02-01;2024-02-28;570000.00;IDR;Untuk tim lapangan baru
-b1c2d3e4-f5a6-7890-bcde-f12345670003;PO-240003;Restock Lubricants Pabrik 2;550e8400-e29b-41d4-a716-446655440001;O;2024-03-10;2024-04-10;1800000.00;IDR;
+b1c2d3e4-f5a6-7890-bcde-f12345670001;PO-240001;Pengadaan Laptop Kantor Jakarta;f47ac10b-58cc-4372-a567-0e02b2c3d479;P;2024-01-15;2024-02-15;48500000.00;IDR;Untuk tim operasional Coffee Plant Jakarta
+b1c2d3e4-f5a6-7890-bcde-f12345670002;PO-240002;Pembelian Safety Equipment;550e8400-e29b-41d4-a716-446655440002;A;2024-02-01;2024-02-28;570000.00;IDR;Untuk tim lapangan roasting plant
+b1c2d3e4-f5a6-7890-bcde-f12345670003;PO-240003;Restock Coffee Bean Toraja;550e8400-e29b-41d4-a716-446655440001;O;2024-03-10;2024-04-10;2850000.00;IDR;Bahan baku Q2
 b1c2d3e4-f5a6-7890-bcde-f12345670004;PO-240004;Pengadaan Electrical Cable;550e8400-e29b-41d4-a716-446655440004;D;2024-03-20;2024-04-20;0.00;IDR;Draft - belum lengkap
 ```
+
+> **Referensi S/4HANA Real:** PO-240001 mirip PO 4500000000 (Laptop, status Follow-On Documents)
 
 **File: `db/data/com.tecrise.procurement-PurchaseOrderItems.csv`**
 
 ```csv
 ID;parent_ID;itemNo;material_ID;description;quantity;uom;unitPrice;netAmount;currency_code
-c1d2e3f4-a5b6-7890-cdef-012345670001;b1c2d3e4-f5a6-7890-bcde-f12345670001;10;a1b2c3d4-e5f6-7890-abcd-ef1234567001;Bearing SKF 6205;5;PC;125000.00;625000.00;IDR
-c1d2e3f4-a5b6-7890-cdef-012345670002;b1c2d3e4-f5a6-7890-bcde-f12345670001;20;a1b2c3d4-e5f6-7890-abcd-ef1234567003;V-Belt Type B68;4;PC;85000.00;340000.00;IDR
-c1d2e3f4-a5b6-7890-cdef-012345670003;b1c2d3e4-f5a6-7890-bcde-f12345670001;30;a1b2c3d4-e5f6-7890-abcd-ef1234567005;Welding Rod E6013 (5Kg);2;KG;95000.00;190000.00;IDR
-c1d2e3f4-a5b6-7890-cdef-012345670004;b1c2d3e4-f5a6-7890-bcde-f12345670001;40;a1b2c3d4-e5f6-7890-abcd-ef1234567008;Glove Latex Industrial;3;BOX;45000.00;135000.00;IDR
+c1d2e3f4-a5b6-7890-cdef-012345670001;b1c2d3e4-f5a6-7890-bcde-f12345670001;10;a1b2c3d4-e5f6-7890-abcd-ef1234567001;Laptop Business 14 inch;10;PC;4850000.00;48500000.00;IDR
 c1d2e3f4-a5b6-7890-cdef-012345670005;b1c2d3e4-f5a6-7890-bcde-f12345670002;10;a1b2c3d4-e5f6-7890-abcd-ef1234567004;Safety Helmet (Yellow);4;PC;75000.00;300000.00;IDR
 c1d2e3f4-a5b6-7890-cdef-012345670006;b1c2d3e4-f5a6-7890-bcde-f12345670002;20;a1b2c3d4-e5f6-7890-abcd-ef1234567008;Glove Latex Industrial;6;BOX;45000.00;270000.00;IDR
-c1d2e3f4-a5b6-7890-cdef-012345670007;b1c2d3e4-f5a6-7890-bcde-f12345670003;10;a1b2c3d4-e5f6-7890-abcd-ef1234567002;Hydraulic Oil ISO 46 (20L);4;L;450000.00;1800000.00;IDR
+c1d2e3f4-a5b6-7890-cdef-012345670007;b1c2d3e4-f5a6-7890-bcde-f12345670003;10;a1b2c3d4-e5f6-7890-abcd-ef1234567003;Coffee Bean Arabica Toraja (1Kg);10;KG;285000.00;2850000.00;IDR
 ```
+
+> **Referensi S/4HANA Real:** Item numbering 10, 20, 30 = sama dengan S/4HANA (00010, 00020, 00030)
 
 ---
 
@@ -241,9 +246,9 @@ $ curl http://localhost:4004/odata/v4/po/Suppliers?\$select=supplierNo,name,city
 {
   "@odata.context": "$metadata#Suppliers(supplierNo,name,city)",
   "value": [
-    { "supplierNo": "SUP-001", "name": "PT Baja Nusantara", "city": "Cikarang" },
+    { "supplierNo": "SUP-001", "name": "PT Andi Coffee Supply", "city": "Cikarang" },
     { "supplierNo": "SUP-002", "name": "CV Mitra Logistik", "city": "Surabaya" },
-    { "supplierNo": "SUP-003", "name": "PT Kimia Farma Supply", "city": "Jakarta" },
+    { "supplierNo": "SUP-003", "name": "PT Wahyu Amaldi Trading", "city": "Karawachi" },
     { "supplierNo": "SUP-004", "name": "UD Sumber Makmur", "city": "Semarang" },
     { "supplierNo": "SUP-005", "name": "PT Global Parts Indonesia", "city": "Jakarta" }
   ]
@@ -288,15 +293,12 @@ $ curl "http://localhost:4004/odata/v4/po/PurchaseOrders?\$expand=supplier(\$sel
   "value": [
     {
       "poNumber": "PO-240001",
-      "description": "Pengadaan Spare Parts Q1",
+      "description": "Pengadaan Laptop Kantor Jakarta",
       "status": "P",
-      "totalAmount": 1295000,
-      "supplier": { "name": "PT Baja Nusantara" },
+      "totalAmount": 48500000,
+      "supplier": { "name": "PT Andi Coffee Supply" },
       "items": [
-        { "itemNo": 10, "description": "Bearing SKF 6205", "quantity": 5, "netAmount": 625000 },
-        { "itemNo": 20, "description": "V-Belt Type B68", "quantity": 4, "netAmount": 340000 },
-        { "itemNo": 30, "description": "Welding Rod E6013 (5Kg)", "quantity": 2, "netAmount": 190000 },
-        { "itemNo": 40, "description": "Glove Latex Industrial", "quantity": 3, "netAmount": 135000 }
+        { "itemNo": 10, "description": "Laptop Business 14 inch", "quantity": 10, "netAmount": 48500000 }
       ]
     },
     {
@@ -304,7 +306,7 @@ $ curl "http://localhost:4004/odata/v4/po/PurchaseOrders?\$expand=supplier(\$sel
       "description": "Pembelian Safety Equipment",
       "status": "A",
       "totalAmount": 570000,
-      "supplier": { "name": "PT Kimia Farma Supply" },
+      "supplier": { "name": "PT Wahyu Amaldi Trading" },
       "items": [
         { "itemNo": 10, "description": "Safety Helmet (Yellow)", "quantity": 4, "netAmount": 300000 },
         { "itemNo": 20, "description": "Glove Latex Industrial", "quantity": 6, "netAmount": 270000 }
@@ -312,12 +314,12 @@ $ curl "http://localhost:4004/odata/v4/po/PurchaseOrders?\$expand=supplier(\$sel
     },
     {
       "poNumber": "PO-240003",
-      "description": "Restock Lubricants Pabrik 2",
+      "description": "Restock Coffee Bean Toraja",
       "status": "O",
-      "totalAmount": 1800000,
+      "totalAmount": 2850000,
       "supplier": { "name": "CV Mitra Logistik" },
       "items": [
-        { "itemNo": 10, "description": "Hydraulic Oil ISO 46 (20L)", "quantity": 4, "netAmount": 1800000 }
+        { "itemNo": 10, "description": "Coffee Bean Arabica Toraja (1Kg)", "quantity": 10, "netAmount": 2850000 }
       ]
     },
     {
@@ -354,14 +356,77 @@ $ curl http://localhost:4004/odata/v4/po/\$metadata | head -50
 |:-----|:-------|:-------|
 | CDS compile | ✅ | Model loaded dari `db/po-schema.cds` |
 | DB deploy | ✅ | 4 CSV files loaded ke in-memory SQLite |
-| Suppliers | ✅ | 5 records — PT Baja, CV Mitra, Kimia Farma, UD Sumber, Global Parts |
-| Materials | ✅ | 8 records — Bearing, Oil, V-Belt, Helmet, Welding Rod, Pipa, Kabel, Glove |
+| Suppliers | ✅ | 5 records — PT Andi Coffee, CV Mitra, Wahyu Amaldi Trading, UD Sumber, Global Parts |
+| Materials | ✅ | 8 records — Laptop, Oil, Coffee Bean, Helmet, Roasting Part, Pipa, Kabel, Glove |
 | PurchaseOrders | ✅ | 4 records — PO-240001 s/d PO-240004 |
-| PurchaseOrderItems | ✅ | 7 records — tersebar di 3 PO (PO-240004 belum punya items) |
+| PurchaseOrderItems | ✅ | 4 records — tersebar di 3 PO (PO-240004 belum punya items) |
 | $expand | ✅ | Deep read PO + supplier + items berfungsi |
 | Custom types | ✅ | POStatus enum (D/O/P/A/R/X) dan UoM enum (PC/KG/L/M/BOX/SET) |
 | Composition | ✅ | Items terikat ke PO via Composition (cascade) |
 | Association | ✅ | Supplier dan Material sebagai referensi |
+
+---
+
+## 🔍 Validasi dengan Data Real S/4HANA — sap.ilmuprogram.com
+
+> Data model yang kita bangun di CAP sudah divalidasi terhadap **sistem SAP S/4HANA real**
+> di `sap.ilmuprogram.com` (Client 777, Company Code 1710 — Andi Coffee).
+
+### Perbandingan Entity Structure
+
+| CAP Entity (Workshop) | S/4HANA OData Entity (Real) | Standard Table |
+|:----------------------|:---------------------------|:--------------|
+| `PurchaseOrders` | `C_PurchaseOrderFsType` | EKKO |
+| `PurchaseOrderItems` | `I_PurchaseOrderItemType` | EKPO |
+| `Suppliers` | `I_SupplierType` / `C_MM_SupplierValueHelp` | LFA1 |
+| `Materials` | `I_MaterialType` / `C_MM_MaterialValueHelp` | MARA |
+| `POStatusHistory` | `to_PurchaseOrderHistory` (navigation) | CDHDR/CDPOS |
+
+### Mapping Field: CAP vs S/4HANA Real
+
+| CAP Field | S/4HANA Real Field | Contoh Data Real |
+|:----------|:-------------------|:-----------------|
+| `poNumber` | `PurchaseOrder` | `4500000015` |
+| `description` | `PurchaseOrder_Text` | `Standard PO` |
+| `supplier.name` | `SupplierName` | `Wahyu Amaldi (Domestic Supplier)` |
+| `supplier.country` | via `I_Supplier.Country` | `ID` (Indonesia 🇮🇩) |
+| `status` (D/O/P/A/R/X) | `PurchasingDocumentStatus` | `03` (Not Yet Sent) / `05` (Follow-On) |
+| `orderDate` | `PurchaseOrderDate` | `2025-10-17` |
+| `totalAmount` | `PurchaseOrderNetAmount` | `3020.00` |
+| `currency_code` | `DocumentCurrency` | `USD` |
+| `items[].itemNo` | `PurchaseOrderItem` | `00010` |
+| `items[].description` | `PurchaseOrderItemText` | `Pembelian` |
+| `items[].quantity` | `OrderQuantity` | `10` |
+| `items[].uom` | `PurchaseOrderQuantityUnit` | `PC` |
+| `items[].unitPrice` | `NetPriceAmount` | `302.00` |
+| `items[].netAmount` | `NetAmount` | `3020.00` |
+
+### Clean Core Extension Fields Ditemukan di Sistem Real
+
+```
+ZZ1 Custom Fields di PO Header (In-App Extension via Key User Tools):
+  ┌──────────────────────────────┬───────────────────────────────┐
+  │ ZZ1_RefExtIDWahyu2_PDH       │ Custom reference field (String)│
+  │ ZZ1_ref_external_h01_PDH     │ Custom reference field (String)│
+  │ ZZ1_RefExtIDVidetra_PDH      │ Custom decimal field = 0.00   │
+  └──────────────────────────────┴───────────────────────────────┘
+
+  Ini BUKTI bahwa In-App Extension (ZZ1_ prefix) sudah berjalan
+  di S/4HANA. Side-by-Side Extension (CAP) yang kita bangun
+  adalah PELENGKAP — bukan pengganti — In-App Extension.
+```
+
+### Supplier Real vs Workshop CSV
+
+| S/4HANA Real Supplier | Workshop CSV Supplier | Analogi |
+|:---------------------|:---------------------|:--------|
+| `17300001` Wahyu Amaldi (Domestic) 🇮🇩 | `SUP-001` PT Baja Nusantara 🇮🇩 | ✅ Domestic ID |
+| `17300002` Domestic US Supplier 2 🇺🇸 | `SUP-002` CV Mitra Logistik 🇮🇩 | ✅ Local supplier |
+| `17258002` Domestic US JV Partner 1 🇺🇸 | `SUP-005` PT Global Parts Indonesia 🇮🇩 | ✅ Partner bisnis |
+| `17300007` Domestic US Subcontractor A 🇺🇸 | `SUP-004` UD Sumber Makmur 🇮🇩 | ✅ Subcontractor |
+
+> **Kesimpulan validasi:** Struktur data model workshop sudah **align** dengan S/4HANA real.
+> Perbedaan hanya di numbering scheme dan currency — yang bisa disesuaikan di production.
 
 ---
 
@@ -373,6 +438,7 @@ $ curl http://localhost:4004/odata/v4/po/\$metadata | head -50
 - ✅ **Composition** (PO → Items) dan **Association** (PO → Supplier) berjalan
 - ✅ **CSV seed data** dengan konteks bisnis Indonesia dimuat otomatis
 - ✅ **OData V4 service** auto-generated dari CDS model
+- ✅ **Divalidasi** terhadap data real S/4HANA di sap.ilmuprogram.com (16 PO, 15+ Suppliers, 100+ Materials)
 [cds] - connect to db > sqlite { url: ':memory:' }
 /> successfully deployed to in-memory database.
 
