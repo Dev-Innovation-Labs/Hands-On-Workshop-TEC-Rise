@@ -1,0 +1,9 @@
+node_modules/
+*.mtar
+gen/
+.env
+.cdsrc-private.json
+default-env.json
+db.sqlite*
+*.sqlite-shm
+*.sqlite-wal

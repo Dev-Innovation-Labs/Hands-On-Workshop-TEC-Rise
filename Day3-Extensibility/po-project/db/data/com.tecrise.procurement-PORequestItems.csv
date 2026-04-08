@@ -1,0 +1,5 @@
+ID;parent_ID;itemNo;materialNo;description;quantity;uom;unitPrice;netAmount;currency;plant;materialGroup
+c1d2e3f4-a5b6-7890-cdef-012345670001;b1c2d3e4-f5a6-7890-bcde-f12345670001;10;EWMS4-01;Small Part for Jakarta Office;10;PC;302.00;3020.00;USD;1710;L001
+c1d2e3f4-a5b6-7890-cdef-012345670002;b1c2d3e4-f5a6-7890-bcde-f12345670002;10;EWMS4-02;Safety Equipment Fast-Moving;6;PC;75.00;450.00;USD;1710;L001
+c1d2e3f4-a5b6-7890-cdef-012345670003;b1c2d3e4-f5a6-7890-bcde-f12345670002;20;EWMS4-01;Glove Latex Industrial;10;EA;45.00;450.00;USD;1710;L001
+c1d2e3f4-a5b6-7890-cdef-012345670004;b1c2d3e4-f5a6-7890-bcde-f12345670003;10;EWMS4-01;Small Part for Office Equipment;20;PC;302.00;6040.00;USD;1710;L001

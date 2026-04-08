@@ -1,162 +1,383 @@
-# ✅ Hands-on 2: OData Service & Business Logic — Hasil
-> **Author:** Wahyu Amaldi — Technical Lead SAP & Full Stack Development
+# Hands-on 2: OData Service, Business Logic & SAP Client
 
-
-> **Status:** VERIFIED  
-> **Tanggal:** 7 April 2026  
-> **CDS Version:** @sap/cds v9.8.4
+> **Durasi:** ~45 menit  
+> **Prerequisite:** Hands-on 1 selesai (`cds watch` berjalan, 3 PO records tampil)
 
 ---
 
 ## Tujuan
 
-Implementasi **OData service** dengan business logic lengkap:
-- Service CDS definition (entities + actions + functions)
-- Event handlers: BEFORE (validasi), AFTER (computed fields), ON (actions)
-- Status management: Draft → Open → Posted → Approved/Rejected
-- Auto-generate PO number, auto-calculate net amount & total
-- Audit trail via POStatusHistory
+Membuat **OData Service**, **event handlers** (auto-numbering, validasi, kalkulasi), dan **SAP OData V2 client** yang bisa membuat PO di S/4HANA real melalui draft-based API.
 
 ---
 
-## File yang Dibuat
+## Langkah 1: Buat Service CDS
 
-### File 1: `srv/po-service.cds` — Service Definition
+Buat file `srv/po-service.cds`:
 
 ```cds
 using { com.tecrise.procurement as po } from '../db/po-schema';
 
 service PurchaseOrderService @(path: '/po') {
 
-    // ----- Entities -----
-    entity PurchaseOrders     as projection on po.PurchaseOrders;
-    entity PurchaseOrderItems as projection on po.PurchaseOrderItems;
+    entity PORequests as projection on po.PORequests
+        actions {
+            // Tombol "Post to SAP" — kirim PO request ke S/4HANA real
+            @(
+                cds.odata.bindingparameter.name: '_it',
+                Common.SideEffects: {
+                    TargetProperties: ['_it/status','_it/statusCriticality','_it/sapPONumber','_it/sapPostDate','_it/sapPostMessage']
+                }
+            )
+            action postToSAP() returns {
+                sapPONumber : String;
+                status      : String;
+                message     : String;
+            };
+        };
 
-    @readonly
-    entity Suppliers          as projection on po.Suppliers;
+    entity PORequestItems as projection on po.PORequestItems;
 
-    @readonly
-    entity Materials          as projection on po.Materials;
-
-    @readonly
-    entity POStatusHistory    as projection on po.POStatusHistory;
-
-    // ----- Actions: Status Transitions -----
-    action postPO(poID: UUID) returns {
-        poNumber : String;
-        status   : String;
-        message  : String;
+    // Function: Fetch suppliers dari SAP real
+    function getSAPSuppliers() returns array of {
+        Supplier     : String;
+        SupplierName : String;
+        Country      : String;
     };
 
-    action cancelPO(poID: UUID) returns {
-        poNumber : String;
-        status   : String;
-        message  : String;
-    };
-
-    action approvePO(poID: UUID) returns {
-        poNumber : String;
-        status   : String;
-        message  : String;
-    };
-
-    action rejectPO(poID: UUID, reason: String) returns {
-        poNumber : String;
-        status   : String;
-        message  : String;
-    };
-
-    // ----- Functions -----
-    function getSupplierPOSummary(supplierID: UUID) returns {
-        supplierName    : String;
-        totalPOs        : Integer;
-        totalAmount     : Decimal(15,2);
-        openPOs         : Integer;
-        postedPOs       : Integer;
+    // Function: Test koneksi SAP
+    function testSAPConnection() returns {
+        ok      : Boolean;
+        status  : Integer;
+        message : String;
     };
 }
 ```
 
-### File 2: `srv/po-service.js` — Event Handlers
+**Perhatikan:**
+- `action postToSAP()` — Bound action, muncul sebagai **tombol** di Fiori UI
+- `Common.SideEffects` — Setelah action selesai, Fiori auto-refresh field status, sapPONumber, dll
+- `getSAPSuppliers()` — Unbound function, fetch data supplier langsung dari SAP
+- `testSAPConnection()` — Utility function untuk cek koneksi SAP
+
+---
+
+## Langkah 2: Buat SAP OData V2 Client
+
+SAP S/4HANA menggunakan **draft-based PO creation** via `MM_PUR_PO_MAINT_V2_SRV`. Flow-nya:
+
+```
+CSRF Token → Create Draft Header → Add Items → Prepare → Activate → Real PO Number
+```
+
+Buat file `srv/lib/sap-client.js`:
+
+```javascript
+/**
+ * SAP OData V2 Client — koneksi ke S/4HANA real (sap.ilmuprogram.com)
+ *
+ * Implements the full draft-based PO creation flow:
+ *   1. POST C_PurchaseOrderTP          → Create draft (header only)
+ *   2. POST ...to_PurchaseOrderItemTP  → Add items one by one
+ *   3. POST C_PurchaseOrderTPPreparation → Validate draft
+ *   4. POST C_PurchaseOrderTPActivation  → Activate → real PO number
+ */
+
+// Skip TLS verification for SAP self-signed cert (dev only)
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
+class SAPClient {
+
+    constructor(config = {}) {
+        this.host     = config.host     || process.env.SAP_HOST     || 'https://sap.ilmuprogram.com';
+        this.client   = config.client   || process.env.SAP_CLIENT   || '777';
+        this.username = config.username || process.env.SAP_USERNAME || '';
+        this.password = config.password || process.env.SAP_PASSWORD || '';
+
+        this.authHeader = 'Basic ' + Buffer.from(`${this.username}:${this.password}`).toString('base64');
+
+        // OData V2 service paths
+        this.PO_SERVICE       = '/sap/opu/odata/sap/MM_PUR_PO_MAINT_V2_SRV';
+        this.SUPPLIER_SERVICE = '/sap/opu/odata/sap/C_SUPPLIER_FS_SRV';
+        this.PO_READ_SERVICE  = '/sap/opu/odata/sap/C_PURCHASEORDER_FS_SRV';
+    }
+
+    get isConfigured() {
+        return !!(this.username && this.password && this.host);
+    }
+
+    // ====================================================
+    // CSRF Token Management
+    // ====================================================
+    async fetchCSRFToken(servicePath) {
+        const url = `${this.host}${servicePath}/?sap-client=${this.client}`;
+        console.log(`[SAP] Fetching CSRF token from: ${url}`);
+
+        const resp = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': this.authHeader,
+                'X-CSRF-Token': 'Fetch',
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!resp.ok) {
+            const text = await resp.text();
+            throw new Error(`CSRF fetch failed (${resp.status}): ${text.substring(0, 300)}`);
+        }
+
+        const csrfToken = resp.headers.get('x-csrf-token');
+        const cookies = resp.headers.getSetCookie?.() || [];
+        const cookieString = cookies.map(c => c.split(';')[0]).join('; ');
+
+        console.log(`[SAP] CSRF token obtained: ${csrfToken ? csrfToken.substring(0, 20) + '...' : 'NONE'}`);
+        return { csrfToken, cookies: cookieString };
+    }
+
+    // ====================================================
+    // Main: Create Purchase Order (Draft → Prepare → Activate)
+    // ====================================================
+    async createPurchaseOrder(poData) {
+        if (!this.isConfigured) {
+            throw new Error('SAP credentials not configured');
+        }
+
+        // Step 1: Fetch CSRF token
+        console.log(`[SAP] === Step 1: Fetch CSRF Token ===`);
+        const { csrfToken, cookies } = await this.fetchCSRFToken(this.PO_SERVICE);
+
+        const headers = {
+            'Authorization': this.authHeader,
+            'X-CSRF-Token': csrfToken,
+            'Cookie': cookies,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'sap-client': this.client
+        };
+
+        // Step 2: Create Draft PO header (WITHOUT items)
+        console.log(`[SAP] === Step 2: Create Draft PO Header ===`);
+        const draftPayload = {
+            PurchaseOrderType: 'NB',
+            CompanyCode: poData.companyCode || '1710',
+            PurchasingOrganization: poData.purchasingOrg || '1710',
+            PurchasingGroup: poData.purchasingGroup || '001',
+            Supplier: poData.supplier,
+            DocumentCurrency: poData.currency || 'USD'
+        };
+
+        const createUrl = `${this.host}${this.PO_SERVICE}/C_PurchaseOrderTP?sap-client=${this.client}`;
+        const createResp = await fetch(createUrl, {
+            method: 'POST', headers,
+            body: JSON.stringify(draftPayload)
+        });
+
+        const createText = await createResp.text();
+        let createData;
+        try { createData = JSON.parse(createText); } catch { createData = null; }
+
+        if (!createResp.ok || !createData?.d) {
+            const errMsg = createData?.error?.message?.value
+                        || `Draft creation failed (${createResp.status})`;
+            return { success: false, sapPONumber: '', message: errMsg };
+        }
+
+        const draft = createData.d;
+        const draftUUID = draft.DraftUUID;
+        const poNumber = draft.PurchaseOrder || '';
+        console.log(`[SAP] Draft created — PO: "${poNumber}", DraftUUID: ${draftUUID}`);
+
+        // Step 3: Add items one by one (same behavior as Fiori standard app)
+        console.log(`[SAP] === Step 3: Add Items to Draft ===`);
+        const draftKey = `C_PurchaseOrderTP(PurchaseOrder='${encodeURIComponent(poNumber)}',DraftUUID=guid'${draftUUID}',IsActiveEntity=false)`;
+
+        for (let idx = 0; idx < (poData.items || []).length; idx++) {
+            const item = poData.items[idx];
+            const itemPayload = {
+                PurchaseOrderItem: String((idx + 1) * 10).padStart(5, '0'),
+                PurchaseOrderItemText: item.description || '',
+                OrderQuantity: String(item.quantity || 0),
+                PurchaseOrderQuantityUnit: item.uom || 'PC',
+                NetPriceAmount: String(item.unitPrice || 0),
+                DocumentCurrency: item.currency || poData.currency || 'USD',
+                Plant: item.plant || '1710',
+                MaterialGroup: item.materialGroup || 'L001'
+            };
+            if (item.materialNo) {
+                itemPayload.Material = item.materialNo;
+            } else {
+                itemPayload.AccountAssignmentCategory = 'K';
+            }
+
+            const itemUrl = `${this.host}${this.PO_SERVICE}/${draftKey}/to_PurchaseOrderItemTP?sap-client=${this.client}`;
+            console.log(`[SAP] POST Item ${idx + 1}: ${item.description}`);
+
+            const itemResp = await fetch(itemUrl, {
+                method: 'POST', headers,
+                body: JSON.stringify(itemPayload)
+            });
+
+            if (!itemResp.ok) {
+                const itemText = await itemResp.text();
+                let itemData;
+                try { itemData = JSON.parse(itemText); } catch { itemData = null; }
+                const errMsg = itemData?.error?.message?.value || `Item creation failed`;
+                return { success: false, sapPONumber: '', message: `Item ${idx + 1} Error: ${errMsg}` };
+            }
+        }
+
+        // Step 4: Prepare (validate)
+        console.log(`[SAP] === Step 4: Prepare Draft ===`);
+        const prepUrl = `${this.host}${this.PO_SERVICE}/C_PurchaseOrderTPPreparation?` +
+            `PurchaseOrder='${encodeURIComponent(poNumber)}'&DraftUUID=guid'${draftUUID}'&` +
+            `IsActiveEntity=false&sap-client=${this.client}`;
+
+        const prepResp = await fetch(prepUrl, { method: 'POST', headers });
+        if (!prepResp.ok) {
+            const prepText = await prepResp.text();
+            let prepData;
+            try { prepData = JSON.parse(prepText); } catch { prepData = null; }
+            const errMsg = prepData?.error?.message?.value || `Preparation failed`;
+            return { success: false, sapPONumber: '', message: `Preparation Error: ${errMsg}` };
+        }
+
+        // Step 5: Activate (save → get real PO number)
+        console.log(`[SAP] === Step 5: Activate Draft ===`);
+        const actUrl = `${this.host}${this.PO_SERVICE}/C_PurchaseOrderTPActivation?` +
+            `PurchaseOrder='${encodeURIComponent(poNumber)}'&DraftUUID=guid'${draftUUID}'&` +
+            `IsActiveEntity=false&sap-client=${this.client}`;
+
+        const actResp = await fetch(actUrl, { method: 'POST', headers });
+        const actText = await actResp.text();
+        let actData;
+        try { actData = JSON.parse(actText); } catch { actData = null; }
+
+        if (actResp.ok && actData?.d) {
+            const sapPONumber = actData.d.PurchaseOrder || '';
+            return {
+                success: true,
+                sapPONumber,
+                message: `PO ${sapPONumber} berhasil dibuat di SAP S/4HANA`
+            };
+        } else {
+            const errMsg = actData?.error?.message?.value || `Activation failed`;
+            return { success: false, sapPONumber: '', message: `Activation Error: ${errMsg}` };
+        }
+    }
+
+    // ====================================================
+    // Fetch Suppliers dari SAP
+    // ====================================================
+    async getSuppliers() {
+        const url = `${this.host}${this.SUPPLIER_SERVICE}/C_MM_SmplSupplierValueHelp?$top=50&$format=json&sap-client=${this.client}`;
+        const resp = await fetch(url, {
+            headers: { 'Authorization': this.authHeader, 'Accept': 'application/json' }
+        });
+        if (!resp.ok) throw new Error(`Supplier fetch failed: ${resp.status}`);
+        const data = await resp.json();
+        return (data?.d?.results || []).map(s => ({
+            Supplier: s.Supplier, SupplierName: s.SupplierName, Country: s.Country
+        }));
+    }
+
+    // ====================================================
+    // Test Connection
+    // ====================================================
+    async testConnection() {
+        const url = `${this.host}${this.PO_READ_SERVICE}/?$format=json&sap-client=${this.client}`;
+        const resp = await fetch(url, {
+            headers: { 'Authorization': this.authHeader, 'Accept': 'application/json' }
+        });
+        return {
+            ok: resp.ok, status: resp.status,
+            message: resp.ok ? 'Connected to SAP successfully' : `Connection failed: ${resp.status}`
+        };
+    }
+}
+
+module.exports = SAPClient;
+```
+
+### SAP OData V2 Draft Flow — Visualisasi
+
+```
+┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│ GET CSRF     │────▶│ POST Draft Header│────▶│ POST Items (x N)│
+│ Token        │     │ C_PurchaseOrderTP│     │ to_PurchaseOrder │
+│              │     │                  │     │ ItemTP           │
+└─────────────┘     └──────────────────┘     └────────┬────────┘
+                                                       │
+                    ┌──────────────────┐     ┌─────────▼────────┐
+                    │ Activate         │◀────│ Prepare (Validate)│
+                    │ → Real PO Number │     │ TPPreparation     │
+                    │ e.g. 4500000016  │     │                   │
+                    └──────────────────┘     └───────────────────┘
+```
+
+> **Kenapa tidak deep-insert?** SAP MM_PUR_PO_MAINT_V2_SRV **tidak mendukung** deep-insert items bersamaan dengan header. Items harus ditambahkan satu per satu ke draft — sama seperti behavior Fiori standard app `Manage Purchase Orders`.
+
+---
+
+## Langkah 3: Buat Service Handler
+
+Buat file `srv/po-service.js`:
 
 ```javascript
 const cds = require('@sap/cds');
+require('dotenv').config();
+const SAPClient = require('./lib/sap-client');
 
 module.exports = class PurchaseOrderService extends cds.ApplicationService {
 
     async init() {
-        const db = await cds.connect.to('db');
 
-        const PurchaseOrders     = 'com.tecrise.procurement.PurchaseOrders';
-        const PurchaseOrderItems = 'com.tecrise.procurement.PurchaseOrderItems';
-        const Suppliers          = 'com.tecrise.procurement.Suppliers';
-        const Materials          = 'com.tecrise.procurement.Materials';
-        const POStatusHistory    = 'com.tecrise.procurement.POStatusHistory';
+        const { PORequests, PORequestItems } = this.entities;
+
+        // Initialize SAP Client
+        const sapClient = new SAPClient();
+        if (sapClient.isConfigured) {
+            console.log(`[SAP] Client configured → ${sapClient.host} (client ${sapClient.client})`);
+        } else {
+            console.log('[SAP] ⚠️  SAP credentials not set. Set SAP_HOST, SAP_USERNAME, SAP_PASSWORD in .env');
+        }
 
         // ============================================
-        // BEFORE CREATE PO: Auto-generate PO Number & Validate
+        // BEFORE CREATE: Auto-generate Request Number
         // ============================================
-        this.before('CREATE', 'PurchaseOrders', async (req) => {
-            const { supplier_ID, orderDate, deliveryDate } = req.data;
-
-            // Auto-generate PO Number (PO-YYXXXX)
+        this.before('CREATE', 'PORequests', async (req) => {
             const year = new Date().getFullYear().toString().slice(-2);
-            const lastPO = await SELECT.one(PurchaseOrders)
-                .columns('poNumber')
+            const last = await SELECT.one(PORequests)
+                .columns('requestNo')
                 .orderBy('createdAt desc');
 
-            let sequence = 1;
-            if (lastPO?.poNumber) {
-                const lastSeq = parseInt(lastPO.poNumber.slice(-4), 10);
-                if (!isNaN(lastSeq)) sequence = lastSeq + 1;
+            let seq = 1;
+            if (last?.requestNo) {
+                const lastSeq = parseInt(last.requestNo.slice(-4), 10);
+                if (!isNaN(lastSeq)) seq = lastSeq + 1;
             }
-            req.data.poNumber = `PO-${year}${String(sequence).padStart(4, '0')}`;
+            req.data.requestNo = `REQ-${year}${String(seq).padStart(4, '0')}`;
 
-            // Default status = Open
-            if (!req.data.status) req.data.status = 'O';
-
-            // Default orderDate = today
             if (!req.data.orderDate) {
                 req.data.orderDate = new Date().toISOString().split('T')[0];
             }
+            if (!req.data.status) req.data.status = 'D';
 
-            // Validate: supplier harus ada dan aktif
-            if (supplier_ID) {
-                const supplier = await SELECT.one(Suppliers).where({ ID: supplier_ID });
-                if (!supplier) req.reject(400, 'Supplier tidak ditemukan');
-                if (!supplier.isActive) req.reject(400, `Supplier "${supplier.name}" sudah tidak aktif`);
-            }
-
-            // Validate: delivery date > order date
-            if (deliveryDate && orderDate && deliveryDate <= orderDate) {
+            if (req.data.deliveryDate && req.data.orderDate && req.data.deliveryDate <= req.data.orderDate) {
                 req.reject(400, 'Delivery Date harus setelah Order Date');
             }
         });
 
         // ============================================
-        // BEFORE CREATE ITEM: Auto-fill dari material & calculate
+        // BEFORE CREATE ITEM: Auto-calculate netAmount
         // ============================================
-        this.before('CREATE', 'PurchaseOrderItems', async (req) => {
-            const { material_ID, quantity, unitPrice } = req.data;
-
-            if (material_ID) {
-                const material = await SELECT.one(Materials).where({ ID: material_ID });
-                if (material) {
-                    if (!req.data.description) req.data.description = material.description;
-                    if (!req.data.uom) req.data.uom = material.uom;
-                    if (!unitPrice) req.data.unitPrice = material.unitPrice;
-                    if (!req.data.currency_code) req.data.currency_code = material.currency_code;
-                }
-            }
-
-            // Auto-calculate net amount
-            const qty = quantity || 0;
-            const price = req.data.unitPrice || unitPrice || 0;
+        this.before('CREATE', 'PORequestItems', async (req) => {
+            const qty = req.data.quantity || 0;
+            const price = req.data.unitPrice || 0;
             req.data.netAmount = qty * price;
 
-            // Auto-assign item number
             if (!req.data.itemNo && req.data.parent_ID) {
-                const lastItem = await SELECT.one(PurchaseOrderItems)
+                const lastItem = await SELECT.one(PORequestItems)
                     .where({ parent_ID: req.data.parent_ID })
                     .columns('itemNo')
                     .orderBy('itemNo desc');
@@ -165,173 +386,120 @@ module.exports = class PurchaseOrderService extends cds.ApplicationService {
         });
 
         // ============================================
-        // AFTER CREATE/UPDATE/DELETE ITEM: Recalculate PO Total
+        // AFTER CREATE/UPDATE/DELETE ITEM: Recalc total
         // ============================================
-        const recalcPOTotal = async (poID) => {
+        const recalcTotal = async (poID) => {
             if (!poID) return;
-            const items = await SELECT.from(PurchaseOrderItems).where({ parent_ID: poID });
-            const total = items.reduce((sum, item) => sum + (item.netAmount || 0), 0);
-            await UPDATE(PurchaseOrders).set({ totalAmount: total }).where({ ID: poID });
+            const items = await SELECT.from(PORequestItems).where({ parent_ID: poID });
+            const total = items.reduce((sum, i) => sum + (i.netAmount || 0), 0);
+            await UPDATE(PORequests).set({ totalAmount: total }).where({ ID: poID });
         };
 
-        this.after('CREATE', 'PurchaseOrderItems', async (data) => {
-            await recalcPOTotal(data.parent_ID);
-        });
-        this.after('UPDATE', 'PurchaseOrderItems', async (data) => {
-            await recalcPOTotal(data.parent_ID);
-        });
-        this.after('DELETE', 'PurchaseOrderItems', async (_, req) => {
-            if (req.data?.parent_ID) await recalcPOTotal(req.data.parent_ID);
+        this.after('CREATE', 'PORequestItems', async (data) => await recalcTotal(data.parent_ID));
+        this.after('UPDATE', 'PORequestItems', async (data) => await recalcTotal(data.parent_ID));
+        this.after('DELETE', 'PORequestItems', async (_, req) => {
+            if (req.data?.parent_ID) await recalcTotal(req.data.parent_ID);
         });
 
         // ============================================
-        // AFTER READ PO: Status criticality (warna Fiori)
+        // AFTER READ: Compute statusCriticality
         // ============================================
-        this.after('READ', 'PurchaseOrders', (results) => {
-            const pos = Array.isArray(results) ? results : [results];
-            pos.forEach(po => {
-                if (po.status) {
-                    const criticalityMap = {
-                        'D': 0, 'O': 2, 'P': 0, 'A': 3, 'R': 1, 'X': 1
-                    };
-                    po.statusCriticality = criticalityMap[po.status] ?? 0;
-                }
-            });
-        });
-
-        // ============================================
-        // BEFORE UPDATE PO: Cegah edit jika sudah final state
-        // ============================================
-        this.before('UPDATE', 'PurchaseOrders', async (req) => {
-            const po = await SELECT.one(PurchaseOrders).where({ ID: req.data.ID });
-            if (po && ['P', 'A', 'R', 'X'].includes(po.status)) {
-                req.reject(400, `PO ${po.poNumber} berstatus "${po.status}" — tidak dapat diubah`);
+        this.after('READ', 'PORequests', (results) => {
+            for (const po of Array.isArray(results) ? results : [results]) {
+                if (!po) continue;
+                po.statusCriticality = { 'D': 2, 'P': 3, 'E': 1 }[po.status] ?? 0;
             }
         });
 
         // ============================================
-        // ACTION: postPO — Open → Posted
+        // BEFORE UPDATE: Block edit jika sudah Posted
         // ============================================
-        this.on('postPO', async (req) => {
-            const { poID } = req.data;
-            if (!poID) req.reject(400, 'poID wajib diisi');
-
-            const po = await SELECT.one(PurchaseOrders).where({ ID: poID });
-            if (!po) req.reject(404, 'PO tidak ditemukan');
-            if (!['D', 'O'].includes(po.status))
-                req.reject(400, `PO ${po.poNumber} tidak bisa di-post (status: ${po.status})`);
-
-            const items = await SELECT.from(PurchaseOrderItems).where({ parent_ID: poID });
-            if (items.length === 0)
-                req.reject(400, `PO ${po.poNumber} tidak memiliki item — tambahkan minimal 1 item`);
-            if (!po.supplier_ID)
-                req.reject(400, `PO ${po.poNumber} belum memiliki Supplier`);
-            if (!po.totalAmount || po.totalAmount <= 0)
-                req.reject(400, `PO ${po.poNumber} total amount harus > 0`);
-
-            await UPDATE(PurchaseOrders).set({ status: 'P' }).where({ ID: poID });
-
-            await INSERT.into(POStatusHistory).entries({
-                ID: cds.utils.uuid(),
-                purchaseOrder_ID: poID,
-                oldStatus: po.status,
-                newStatus: 'P',
-                changedBy: req.user?.id || 'system',
-                changedAt: new Date().toISOString(),
-                comment: 'PO posted successfully'
-            });
-
-            return {
-                poNumber: po.poNumber,
-                status: 'Posted',
-                message: `PO ${po.poNumber} berhasil di-posting (${items.length} items, total: ${po.totalAmount})`
-            };
+        this.before('UPDATE', 'PORequests', async (req) => {
+            const po = await SELECT.one(PORequests).where({ ID: req.data.ID });
+            if (po?.status === 'P') {
+                req.reject(400, `Request ${po.requestNo} sudah di-post ke SAP (PO: ${po.sapPONumber}) — tidak dapat diubah`);
+            }
         });
 
         // ============================================
-        // ACTION: cancelPO — Draft/Open → Cancelled
+        // ACTION: postToSAP — Kirim PO ke S/4HANA real
         // ============================================
-        this.on('cancelPO', async (req) => {
-            const { poID } = req.data;
-            const po = await SELECT.one(PurchaseOrders).where({ ID: poID });
-            if (!po) req.reject(404, 'PO tidak ditemukan');
-            if (!['D', 'O'].includes(po.status))
-                req.reject(400, `PO ${po.poNumber} tidak bisa di-cancel (status: ${po.status})`);
+        this.on('postToSAP', 'PORequests', async (req) => {
+            const ID = req.params[0]?.ID || req.params[0];
 
-            await UPDATE(PurchaseOrders).set({ status: 'X' }).where({ ID: poID });
-            await INSERT.into(POStatusHistory).entries({
-                ID: cds.utils.uuid(), purchaseOrder_ID: poID,
-                oldStatus: po.status, newStatus: 'X',
-                changedBy: req.user?.id || 'system',
-                changedAt: new Date().toISOString(),
-                comment: 'PO cancelled'
-            });
+            const po = await SELECT.one(PORequests).where({ ID });
+            if (!po) req.reject(404, 'PO Request tidak ditemukan');
+            if (po.status === 'P') req.reject(400, `Sudah di-post (PO: ${po.sapPONumber})`);
+            if (!po.supplier) req.reject(400, 'Supplier belum diisi');
 
-            return { poNumber: po.poNumber, status: 'Cancelled', message: `PO ${po.poNumber} berhasil dibatalkan` };
+            const items = await SELECT.from(PORequestItems).where({ parent_ID: ID });
+            if (items.length === 0) req.reject(400, 'Belum ada items');
+            if (!po.totalAmount || po.totalAmount <= 0) req.reject(400, 'Total amount harus > 0');
+            if (!sapClient.isConfigured) req.reject(500, 'SAP connection not configured');
+
+            console.log(`[SAP] Posting ${po.requestNo} → Supplier: ${po.supplier}, Items: ${items.length}`);
+
+            try {
+                const result = await sapClient.createPurchaseOrder({
+                    companyCode: po.companyCode,
+                    purchasingOrg: po.purchasingOrg,
+                    purchasingGroup: po.purchasingGroup,
+                    supplier: po.supplier,
+                    currency: po.currency,
+                    orderDate: po.orderDate,
+                    items: items
+                });
+
+                const now = new Date().toISOString();
+
+                if (result.success) {
+                    await UPDATE(PORequests).set({
+                        status: 'P', sapPONumber: result.sapPONumber,
+                        sapPostDate: now, sapPostMessage: result.message
+                    }).where({ ID });
+
+                    console.log(`[SAP] ✅ Success! SAP PO: ${result.sapPONumber}`);
+                    return { sapPONumber: result.sapPONumber, status: 'Posted', message: result.message };
+                } else {
+                    await UPDATE(PORequests).set({
+                        status: 'E', sapPostDate: now, sapPostMessage: `Error: ${result.message}`
+                    }).where({ ID });
+
+                    return { sapPONumber: '', status: 'Error', message: result.message };
+                }
+            } catch (err) {
+                await UPDATE(PORequests).set({
+                    status: 'E', sapPostDate: new Date().toISOString(),
+                    sapPostMessage: `Connection Error: ${err.message}`
+                }).where({ ID });
+                return { sapPONumber: '', status: 'Error', message: err.message };
+            }
         });
 
         // ============================================
-        // ACTION: approvePO — Posted → Approved
+        // FUNCTION: getSAPSuppliers
         // ============================================
-        this.on('approvePO', async (req) => {
-            const { poID } = req.data;
-            const po = await SELECT.one(PurchaseOrders).where({ ID: poID });
-            if (!po) req.reject(404, 'PO tidak ditemukan');
-            if (po.status !== 'P')
-                req.reject(400, `PO ${po.poNumber} harus berstatus "Posted" untuk di-approve`);
-
-            await UPDATE(PurchaseOrders).set({ status: 'A' }).where({ ID: poID });
-            await INSERT.into(POStatusHistory).entries({
-                ID: cds.utils.uuid(), purchaseOrder_ID: poID,
-                oldStatus: 'P', newStatus: 'A',
-                changedBy: req.user?.id || 'system',
-                changedAt: new Date().toISOString(),
-                comment: 'PO approved by manager'
-            });
-
-            return { poNumber: po.poNumber, status: 'Approved', message: `PO ${po.poNumber} disetujui` };
+        this.on('getSAPSuppliers', async (req) => {
+            if (!sapClient.isConfigured) req.reject(500, 'SAP connection not configured');
+            try {
+                return await sapClient.getSuppliers();
+            } catch (err) {
+                req.reject(500, `Failed to fetch suppliers: ${err.message}`);
+            }
         });
 
         // ============================================
-        // ACTION: rejectPO — Posted → Rejected
+        // FUNCTION: testSAPConnection
         // ============================================
-        this.on('rejectPO', async (req) => {
-            const { poID, reason } = req.data;
-            const po = await SELECT.one(PurchaseOrders).where({ ID: poID });
-            if (!po) req.reject(404, 'PO tidak ditemukan');
-            if (po.status !== 'P')
-                req.reject(400, `PO ${po.poNumber} harus berstatus "Posted" untuk di-reject`);
-            if (!reason?.trim())
-                req.reject(400, 'Alasan penolakan wajib diisi');
-
-            await UPDATE(PurchaseOrders).set({ status: 'R' }).where({ ID: poID });
-            await INSERT.into(POStatusHistory).entries({
-                ID: cds.utils.uuid(), purchaseOrder_ID: poID,
-                oldStatus: 'P', newStatus: 'R',
-                changedBy: req.user?.id || 'system',
-                changedAt: new Date().toISOString(),
-                comment: `Rejected: ${reason}`
-            });
-
-            return { poNumber: po.poNumber, status: 'Rejected', message: `PO ${po.poNumber} ditolak. Alasan: ${reason}` };
-        });
-
-        // ============================================
-        // FUNCTION: getSupplierPOSummary
-        // ============================================
-        this.on('getSupplierPOSummary', async (req) => {
-            const { supplierID } = req.data;
-            const supplier = await SELECT.one(Suppliers).where({ ID: supplierID });
-            if (!supplier) req.reject(404, 'Supplier tidak ditemukan');
-
-            const pos = await SELECT.from(PurchaseOrders).where({ supplier_ID: supplierID });
-            return {
-                supplierName: supplier.name,
-                totalPOs: pos.length,
-                totalAmount: pos.reduce((sum, p) => sum + (p.totalAmount || 0), 0),
-                openPOs: pos.filter(p => ['D', 'O'].includes(p.status)).length,
-                postedPOs: pos.filter(p => ['P', 'A'].includes(p.status)).length
-            };
+        this.on('testSAPConnection', async () => {
+            if (!sapClient.isConfigured) {
+                return { ok: false, status: 0, message: 'SAP credentials not configured' };
+            }
+            try {
+                return await sapClient.testConnection();
+            } catch (err) {
+                return { ok: false, status: 0, message: err.message };
+            }
         });
 
         return super.init();
@@ -341,443 +509,111 @@ module.exports = class PurchaseOrderService extends cds.ApplicationService {
 
 ---
 
-## Test Results — Event Handlers
+## Langkah 4: Konfigurasi SAP Connection
 
-### Test 1: BEFORE CREATE PO — Auto PO Number & Validation
+Buat file `.env` di root project:
+
+```ini
+# SAP S/4HANA Connection
+SAP_HOST=https://sap.ilmuprogram.com
+SAP_CLIENT=777
+SAP_USERNAME=wahyu.amaldi
+SAP_PASSWORD=Pas671_ok12345
+```
+
+> **Penting:** Tambahkan `.env` ke `.gitignore` agar credentials tidak ter-push.
+
+---
+
+## Langkah 5: Verifikasi
+
+Jalankan server dan test:
 
 ```bash
-# Create PO baru
-$ curl -X POST http://localhost:4004/odata/v4/po/PurchaseOrders \
+cds watch
+```
+
+### Test 1: Service Metadata
+
+```bash
+curl http://localhost:4004/po/$metadata
+```
+
+Pastikan ada entity `PORequests` dengan action `postToSAP`.
+
+### Test 2: Test SAP Connection
+
+```bash
+curl -s http://localhost:4004/po/testSAPConnection() | python3 -m json.tool
+```
+
+**Expected:**
+```json
+{
+  "@odata.context": "$metadata#Edm.Untyped",
+  "ok": true,
+  "status": 200,
+  "message": "Connected to SAP successfully"
+}
+```
+
+### Test 3: Fetch Suppliers dari SAP Real
+
+```bash
+curl -s http://localhost:4004/po/getSAPSuppliers() | python3 -m json.tool
+```
+
+**Expected:** List supplier dari S/4HANA (`17300001`, `17300002`, dll).
+
+### Test 4: Create PO Request via API
+
+```bash
+curl -s -X POST http://localhost:4004/po/PORequests \
   -H "Content-Type: application/json" \
   -d '{
-    "description": "Pengadaan Tools Maintenance Q2",
-    "supplier_ID": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-    "orderDate": "2024-04-01",
-    "deliveryDate": "2024-05-01",
-    "currency_code": "IDR",
-    "notes": "Untuk kebutuhan maintenance shutdown"
-  }'
+    "description": "Test PO dari Hands-on",
+    "supplier": "17300001",
+    "supplierName": "Domestic Supplier",
+    "deliveryDate": "2026-05-01",
+    "currency": "USD"
+  }' | python3 -m json.tool
 ```
 
-**✅ Response (Status: 201 Created):**
+**Expected:** Record baru dengan `requestNo` auto-generated (e.g., `REQ-260004`).
 
-```json
-{
-  "ID": "a1234567-b890-cdef-1234-567890abcdef",
-  "poNumber": "PO-260005",
-  "description": "Pengadaan Tools Maintenance Q2",
-  "status": "O",
-  "orderDate": "2024-04-01",
-  "deliveryDate": "2024-05-01",
-  "totalAmount": 0,
-  "currency_code": "IDR",
-  "createdBy": "anonymous",
-  "createdAt": "2026-04-07T10:30:00.000Z"
-}
+---
+
+## Struktur Project Saat Ini
+
 ```
-
-**Verifikasi:**
-- ✅ `poNumber` auto-generated: `PO-260005` (tahun 26, sequence 0005)
-- ✅ `status` default ke `O` (Open)
-- ✅ `createdBy` dan `createdAt` diisi otomatis oleh `managed` aspect
-- ✅ `totalAmount` = 0 (belum ada items)
-
-### Test 2: BEFORE CREATE PO — Validation Error (Delivery < Order Date)
-
-```bash
-$ curl -X POST http://localhost:4004/odata/v4/po/PurchaseOrders \
-  -H "Content-Type: application/json" \
-  -d '{
-    "description": "Test Invalid Date",
-    "supplier_ID": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-    "orderDate": "2024-05-01",
-    "deliveryDate": "2024-04-01"
-  }'
-```
-
-**✅ Response (Status: 400):**
-
-```json
-{
-  "error": {
-    "code": "400",
-    "message": "Delivery Date harus setelah Order Date"
-  }
-}
-```
-
-### Test 3: BEFORE CREATE ITEM — Auto-fill dari Material Master
-
-```bash
-# Tambah item ke PO (hanya kirim material_ID dan quantity — sisanya auto-fill)
-$ curl -X POST http://localhost:4004/odata/v4/po/PurchaseOrderItems \
-  -H "Content-Type: application/json" \
-  -d '{
-    "parent_ID": "<PO_ID_FROM_TEST_1>",
-    "material_ID": "a1b2c3d4-e5f6-7890-abcd-ef1234567001",
-    "quantity": 10
-  }'
-```
-
-**✅ Response (Status: 201 Created):**
-
-```json
-{
-  "ID": "...",
-  "parent_ID": "<PO_ID>",
-  "itemNo": 10,
-  "material_ID": "a1b2c3d4-e5f6-7890-abcd-ef1234567001",
-  "description": "Bearing SKF 6205",
-  "quantity": 10,
-  "uom": "PC",
-  "unitPrice": 125000,
-  "netAmount": 1250000,
-  "currency_code": "IDR"
-}
-```
-
-**Verifikasi auto-fill:**
-- ✅ `description` → "Bearing SKF 6205" (dari material master)
-- ✅ `uom` → "PC" (dari material master)
-- ✅ `unitPrice` → 125000 (dari material master)
-- ✅ `netAmount` → 1250000 (10 × 125000, auto-calculated)
-- ✅ `itemNo` → 10 (auto-assigned, increment 10)
-- ✅ `currency_code` → "IDR" (dari material master)
-
-### Test 4: AFTER CREATE ITEM — Auto Recalculate PO Total
-
-```bash
-# Cek PO total setelah item ditambahkan
-$ curl "http://localhost:4004/odata/v4/po/PurchaseOrders(<PO_ID>)?\$select=poNumber,totalAmount"
-```
-
-**✅ Response:**
-
-```json
-{
-  "poNumber": "PO-260005",
-  "totalAmount": 1250000
-}
-```
-
-- ✅ `totalAmount` otomatis ter-update dari 0 → 1250000 setelah item ditambahkan
-
-### Test 5: ACTION postPO — Posting PO
-
-```bash
-$ curl -X POST http://localhost:4004/odata/v4/po/postPO \
-  -H "Content-Type: application/json" \
-  -d '{"poID": "<PO_ID>"}'
-```
-
-**✅ Response (Status: 200):**
-
-```json
-{
-  "poNumber": "PO-260005",
-  "status": "Posted",
-  "message": "PO PO-260005 berhasil di-posting (1 items, total: 1250000)"
-}
-```
-
-### Test 6: ACTION postPO — Error: PO tanpa items
-
-```bash
-# Coba post PO-240004 yang belum punya items
-$ curl -X POST http://localhost:4004/odata/v4/po/postPO \
-  -H "Content-Type: application/json" \
-  -d '{"poID": "b1c2d3e4-f5a6-7890-bcde-f12345670004"}'
-```
-
-**✅ Response (Status: 400):**
-
-```json
-{
-  "error": {
-    "code": "400",
-    "message": "PO PO-240004 tidak memiliki item — tambahkan minimal 1 item"
-  }
-}
-```
-
-### Test 7: ACTION approvePO — Approve PO yang sudah di-post
-
-```bash
-$ curl -X POST http://localhost:4004/odata/v4/po/approvePO \
-  -H "Content-Type: application/json" \
-  -d '{"poID": "<PO_ID>"}'
-```
-
-**✅ Response (Status: 200):**
-
-```json
-{
-  "poNumber": "PO-260005",
-  "status": "Approved",
-  "message": "PO PO-260005 disetujui"
-}
-```
-
-### Test 8: ACTION rejectPO — Reject tanpa alasan
-
-```bash
-$ curl -X POST http://localhost:4004/odata/v4/po/rejectPO \
-  -H "Content-Type: application/json" \
-  -d '{"poID": "<POSTED_PO_ID>", "reason": ""}'
-```
-
-**✅ Response (Status: 400):**
-
-```json
-{
-  "error": {
-    "code": "400",
-    "message": "Alasan penolakan wajib diisi"
-  }
-}
-```
-
-### Test 9: ACTION cancelPO — Cancel PO yang status Open
-
-```bash
-$ curl -X POST http://localhost:4004/odata/v4/po/cancelPO \
-  -H "Content-Type: application/json" \
-  -d '{"poID": "b1c2d3e4-f5a6-7890-bcde-f12345670003"}'
-```
-
-**✅ Response (Status: 200):**
-
-```json
-{
-  "poNumber": "PO-240003",
-  "status": "Cancelled",
-  "message": "PO PO-240003 berhasil dibatalkan"
-}
-```
-
-### Test 10: BEFORE UPDATE — Cegah Edit PO yang Sudah Posted
-
-```bash
-# Coba ubah PO yang sudah Approved
-$ curl -X PATCH "http://localhost:4004/odata/v4/po/PurchaseOrders(b1c2d3e4-f5a6-7890-bcde-f12345670002)" \
-  -H "Content-Type: application/json" \
-  -d '{"description": "Coba ubah"}'
-```
-
-**✅ Response (Status: 400):**
-
-```json
-{
-  "error": {
-    "code": "400",
-    "message": "PO PO-240002 berstatus \"A\" — tidak dapat diubah"
-  }
-}
-```
-
-### Test 11: FUNCTION getSupplierPOSummary
-
-```bash
-$ curl "http://localhost:4004/odata/v4/po/getSupplierPOSummary(supplierID=f47ac10b-58cc-4372-a567-0e02b2c3d479)"
-```
-
-**✅ Response (Status: 200):**
-
-```json
-{
-  "supplierName": "PT Baja Nusantara",
-  "totalPOs": 2,
-  "totalAmount": 2545000,
-  "openPOs": 0,
-  "postedPOs": 2
-}
-```
-
-### Test 12: Audit Trail — POStatusHistory
-
-```bash
-$ curl "http://localhost:4004/odata/v4/po/POStatusHistory?\$orderby=changedAt desc&\$top=3"
-```
-
-**✅ Response (Status: 200):**
-
-```json
-{
-  "value": [
-    {
-      "oldStatus": "P",
-      "newStatus": "A",
-      "changedBy": "anonymous",
-      "comment": "PO approved by manager"
-    },
-    {
-      "oldStatus": "O",
-      "newStatus": "P",
-      "changedBy": "anonymous",
-      "comment": "PO posted successfully"
-    },
-    {
-      "oldStatus": "O",
-      "newStatus": "X",
-      "changedBy": "anonymous",
-      "comment": "PO cancelled"
-    }
-  ]
-}
+po-project/
+├── package.json
+├── .env                       ← SAP credentials (gitignored)
+├── db/
+│   ├── po-schema.cds
+│   └── data/
+│       ├── ...PORequests.csv
+│       └── ...PORequestItems.csv
+├── srv/
+│   ├── po-service.cds         ← Service definition + action
+│   ├── po-service.js          ← Event handlers + postToSAP logic
+│   └── lib/
+│       └── sap-client.js      ← SAP OData V2 client (5-step draft flow)
+└── node_modules/
 ```
 
 ---
 
-## Handler Lifecycle — Visual Flow
+## Checkpoint
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  CREATE PurchaseOrder                                        │
-│                                                              │
-│  BEFORE: ① Auto-generate poNumber (PO-YYXXXX)              │
-│          ② Default status = "O" (Open)                      │
-│          ③ Default orderDate = today                         │
-│          ④ Validate supplier exists & active                 │
-│          ⑤ Validate deliveryDate > orderDate                 │
-│                    ↓                                         │
-│  ON:     Default CDS INSERT (framework handles)             │
-│                    ↓                                         │
-│  AFTER:  (none for CREATE)                                  │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│  CREATE PurchaseOrderItem                                    │
-│                                                              │
-│  BEFORE: ① Auto-fill description, uom, unitPrice from mat  │
-│          ② Auto-calculate netAmount = qty × unitPrice       │
-│          ③ Auto-assign itemNo (increment 10)                │
-│                    ↓                                         │
-│  ON:     Default CDS INSERT                                 │
-│                    ↓                                         │
-│  AFTER:  ① Recalculate PO totalAmount                       │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│  READ PurchaseOrders                                         │
-│                                                              │
-│  BEFORE: (none)                                              │
-│                    ↓                                         │
-│  ON:     Default CDS SELECT                                 │
-│                    ↓                                         │
-│  AFTER:  ① Compute statusCriticality (warna Fiori)          │
-│             D=0(abu) O=2(orange) P=0 A=3(hijau) R=1(merah) │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│  ACTION postPO                                               │
-│                                                              │
-│  ON:     ① Validate status D/O                              │
-│          ② Validate items.length > 0                         │
-│          ③ Validate supplier exists                          │
-│          ④ Validate totalAmount > 0                          │
-│          ⑤ UPDATE status → "P"                              │
-│          ⑥ INSERT POStatusHistory (audit trail)              │
-│          ⑦ Return confirmation message                       │
-└─────────────────────────────────────────────────────────────┘
-```
+| # | Cek | Status |
+|:--|:----|:-------|
+| 1 | `cds watch` tanpa error, `[SAP] Client configured` muncul di log | ☐ |
+| 2 | `testSAPConnection()` → `ok: true` | ☐ |
+| 3 | `getSAPSuppliers()` → list suppliers dari SAP real | ☐ |
+| 4 | POST `/po/PORequests` → auto-generate `requestNo` | ☐ |
+| 5 | POST item → `netAmount` auto-calculated | ☐ |
 
 ---
 
-## Ringkasan Test Results
-
-| # | Test Case | Handler | Status | Detail |
-|:--|:----------|:--------|:-------|:-------|
-| 1 | Create PO baru | BEFORE CREATE | ✅ 201 | PO number auto: PO-260005, status: O |
-| 2 | Delivery < Order Date | BEFORE CREATE | ✅ 400 | Validation ditolak |
-| 3 | Tambah item + auto-fill | BEFORE CREATE Item | ✅ 201 | Material master auto-fill + netAmount calc |
-| 4 | PO total recalculated | AFTER CREATE Item | ✅ 200 | totalAmount updated otomatis |
-| 5 | Post PO berhasil | ON postPO | ✅ 200 | Status O → P |
-| 6 | Post PO tanpa items | ON postPO | ✅ 400 | Ditolak: "minimal 1 item" |
-| 7 | Approve PO | ON approvePO | ✅ 200 | Status P → A |
-| 8 | Reject tanpa alasan | ON rejectPO | ✅ 400 | "Alasan wajib diisi" |
-| 9 | Cancel PO | ON cancelPO | ✅ 200 | Status O → X |
-| 10 | Edit PO Approved | BEFORE UPDATE | ✅ 400 | "tidak dapat diubah" |
-| 11 | Supplier PO Summary | ON Function | ✅ 200 | Aggregate data per supplier |
-| 12 | Audit trail | READ | ✅ 200 | Status changes logged |
-
----
-
-## Kesimpulan
-
-- ✅ **Auto PO Number** — generated otomatis dengan format PO-YYXXXX
-- ✅ **Auto-fill dari Material Master** — description, uom, unitPrice, currency
-- ✅ **Auto-calculate** — netAmount per item, totalAmount di header
-- ✅ **Status Management** — Draft → Open → Posted → Approved/Rejected/Cancelled
-- ✅ **Validasi Bisnis** — supplier aktif, delivery > order date, items wajib, alasan reject wajib
-- ✅ **Immutable Protection** — PO Posted/Approved/Rejected tidak bisa di-edit
-- ✅ **Audit Trail** — setiap perubahan status tercatat di POStatusHistory
-- ✅ **4 Actions + 1 Function** berjalan dengan validasi lengkap
-
----
-
-## 🔍 Validasi Business Logic vs S/4HANA Real — sap.ilmuprogram.com
-
-> Business logic yang kita bangun di CAP handler telah divalidasi terhadap perilaku
-> **sistem SAP S/4HANA real** di `sap.ilmuprogram.com` (Client 777, Company Code 1710).
-
-### Status Flow: CAP vs S/4HANA Real
-
-```
-Workshop (CAP):                           S/4HANA Real (C_PURCHASEORDER_FS_SRV):
-═══════════════                           ════════════════════════════════════════
-
-Draft (D)          ←→  Draft (PurchasingDocumentStatus: '')
-    ↓ save                  ↓ save
-Open (O)           ←→  Not Yet Sent (Status: 03)
-    ↓ postPO()             ↓ PO Release
-Posted (P)         ←→  Follow-On Documents (Status: 05)
-    ↓ approvePO()          ↓ Manager approval (workflow)
-Approved (A)       ←→  Completed (dengan Goods Receipt + Invoice)
-    ├ rejectPO()           ├ Return to requester
-Rejected (R)       ←→  Blocked/Rejected
-    ├ cancelPO()           ├ Delete/Close PO
-Cancelled (X)      ←→  Deletion Flag set
-```
-
-### Bukti Data Real: PO Status di sap.ilmuprogram.com
-
-| PO | Status Real | Status Code | CAP Equivalent |
-|:---|:-----------|:------------|:--------------|
-| `4500000011` | **Draft** | (empty) | `D` (Draft) |
-| `4500000014` | **Draft** | (empty) | `D` (Draft) |
-| `4500000015` | **Not Yet Sent** | `03` | `O` (Open) |
-| `4500000000` | **Follow-On Documents** | `05` | `P` (Posted) |
-| `4500000010` | **Follow-On Documents** | `05` | `A` (Approved — has GR) |
-
-### Business Logic Perbandingan
-
-| Validasi | CAP Handler (Workshop) | S/4HANA Real | Match |
-|:---------|:----------------------|:-------------|:------|
-| PO Number auto-generate | `PO-YYXXXX` sequence | `4500000000` sequential | ✅ |
-| Item auto-numbering | `10, 20, 30...` increment 10 | `00010, 00020...` increment 10 | ✅ |
-| Net Amount = Qty × Price | `netAmount = quantity * unitPrice` | `NetAmount = OrderQuantity * NetPriceAmount` | ✅ |
-| Supplier wajib sebelum posting | `req.reject(400, 'belum memiliki Supplier')` | PO 4500000011 (Draft, $0, no supplier) | ✅ |
-| Items wajib sebelum posting | `items.length === 0 → reject` | PO 4500000011 (Draft) vs 4500000015 (with item) | ✅ |
-| Immutable setelah posting | `['P','A','R','X'] → reject` | Follow-On Documents = locked | ✅ |
-| Audit trail | `POStatusHistory` entity | `CDHDR/CDPOS` change documents | ✅ |
-| Custom extension fields | CAP = new entity/field | S/4HANA = ZZ1_ In-App Extension | ✅ |
-
-### Real PO Item Detail (PO 4500000015 by WAHYU.AMALDI)
-
-```
-Item Details dari S/4HANA Real:
-═══════════════════════════════════════════════════════
-  PurchaseOrderItem      : 00010
-  PurchaseOrderItemText  : Pembelian
-  MaterialGroup          : YBFA12 — Office Equipment
-  OrderQuantity          : 10 PC
-  NetPriceAmount         : $302.00 per PC
-  NetAmount              : $3,020.00 (= 10 × 302)   ← SAMA dengan auto-calc di handler!
-  Plant                  : 1710 — Coffee Plant – Jakarta
-  AccountAssignment      : Asset (A)
-  TaxCode                : I1 — A/P Sales Tax
-```
-
-> **Validasi terkonfirmasi:** Semua business logic (auto-number, auto-calc, status flow,
-> validasi mandatory, immutability) yang diimplementasikan di CAP handler **konsisten
-> dengan perilaku S/4HANA real**.
+**Lanjut ke → [Hands-on 3: Fiori UI, HANA Cloud & Post to SAP](./handson-3-odata-testing.md)**

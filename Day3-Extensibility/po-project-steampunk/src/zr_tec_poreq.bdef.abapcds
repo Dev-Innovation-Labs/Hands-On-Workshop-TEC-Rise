@@ -1,0 +1,112 @@
+managed implementation in class ZBP_TEC_POREQ unique; " ← managed = framework handle CRUD
+strict ( 2 );                                         " ← strict mode: enforce best practices
+with draft;                                           " ← enable Fiori draft/edit mode
+
+define behavior for ZR_TEC_POREQ alias PORequest      " ← alias: nama pendek utk ABAP code
+persistent table ztec_poreq                            " ← tabel untuk data aktif (bukan draft)
+draft table ztec_d_poreq                               " ← tabel draft (auto-generated)
+etag master LocalLastChanged                           " ← optimistic locking (concurrency)
+lock master total etag LastChangedAt                   " ← entity ini yg mengelola lock
+authorization master ( global )                        " ← auth check di level root entity
+
+{
+  // Standard CRUD — managed = framework auto handle INSERT/UPDATE/DELETE
+  create;
+  update;
+  delete;
+
+  // Draft support — 5 standard draft actions
+  draft action Edit;                    " ← copy data aktif → draft table
+  draft action Activate optimized;      " ← validasi + draft → tabel aktif
+  draft action Discard;                 " ← hapus draft, kembali ke data aktif
+  draft action Resume;                  " ← buka kembali draft yg ditinggalkan
+  draft determine action Prepare;       " ← pre-check sebelum Activate
+
+  // Custom action — tombol di Fiori UI
+  action postToSAP result [1] $self;    " ← return 1 instance dari entity ini
+
+  // Determination — auto-logic saat create
+  determination setRequestNo on modify { create; }
+
+  // Validation — cek aturan bisnis saat save
+  validation validateSupplier on save { create; update; field Supplier; }
+  validation validateDeliveryDate on save { create; update; field DeliveryDate; }
+
+  // Field control
+  field ( readonly ) RequestUUID, RequestNo, TotalAmount, StatusCriticality,
+                     SAPPONumber, SAPPostMessage, CreatedBy, CreatedAt,
+                     LastChangedBy, LastChangedAt, LocalLastChanged;
+  field ( readonly : update ) Status;   " ← bisa set saat create, readonly saat update
+
+  // Mapping to DB fields
+  mapping for ztec_poreq
+  {
+    RequestUUID    = request_uuid;
+    RequestNo      = request_no;
+    Description    = description;
+    CompanyCode    = company_code;
+    PurchasingOrg  = purchasing_org;
+    PurchasingGroup = purchasing_group;
+    Supplier       = supplier;
+    SupplierName   = supplier_name;
+    OrderDate      = order_date;
+    DeliveryDate   = delivery_date;
+    TotalAmount    = total_amount;
+    Currency       = currency;
+    Notes          = notes;
+    Status         = status;
+    SAPPONumber    = sap_po_number;
+    SAPPostMessage = sap_post_message;
+    CreatedBy      = created_by;
+    CreatedAt      = created_at;
+    LastChangedBy  = last_changed_by;
+    LastChangedAt  = last_changed_at;
+    LocalLastChanged = local_last_changed;
+  }
+
+  // Composition — items bisa di-create via parent (deep insert)
+  association _Items { create; with draft; }
+}
+
+define behavior for ZR_TEC_POREQI alias PORequestItem
+persistent table ztec_poreqi
+draft table ztec_d_poreqi
+etag master LocalLastChanged
+lock dependent by _PORequest              " ← lock dikelola oleh parent
+authorization dependent by _PORequest     " ← auth check ikut parent
+
+{
+  update;
+  delete;
+  " Tidak ada create — items hanya bisa dibuat via parent (composition)
+
+  determination calcNetAmount on modify { create; update; field Quantity, UnitPrice; }
+  determination calcHeaderTotal on modify { create; update; delete; }  " ← jalan saat item ditambah/ubah/hapus
+
+  field ( readonly ) ItemUUID, RequestUUID, RequestNo,
+                     CreatedBy, CreatedAt, LastChangedBy, LastChangedAt, LocalLastChanged;
+
+  mapping for ztec_poreqi
+  {
+    ItemUUID       = item_uuid;
+    RequestUUID    = request_uuid;
+    RequestNo      = request_no;
+    ItemNo         = item_no;
+    MaterialNo     = material_no;
+    Description    = description;
+    Quantity       = quantity;
+    UoM            = uom;
+    UnitPrice      = unit_price;
+    NetAmount      = net_amount;
+    Currency       = currency;
+    Plant          = plant;
+    MaterialGroup  = material_group;
+    CreatedBy      = created_by;
+    CreatedAt      = created_at;
+    LastChangedBy  = last_changed_by;
+    LastChangedAt  = last_changed_at;
+    LocalLastChanged = local_last_changed;
+  }
+
+  association _PORequest { with draft; }
+}

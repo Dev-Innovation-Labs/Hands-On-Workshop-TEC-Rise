@@ -1,0 +1,18 @@
+{
+  "name": "po-project-in-apps",
+  "version": "1.0.0",
+  "description": "PO Request Management — In-App Extensibility (CBO sebagai backend, tanpa HANA Cloud)",
+  "dependencies": {
+    "@sap/cds": "^9",
+    "dotenv": "^16"
+  },
+  "devDependencies": {
+    "@sap/cds-dk": "^9"
+  },
+  "scripts": {
+    "watch": "cds watch"
+  },
+  "sapux": [
+    "app/po"
+  ]
+}

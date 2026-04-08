@@ -1,0 +1,4 @@
+ID;requestNo;description;companyCode;purchasingOrg;purchasingGroup;supplier;supplierName;orderDate;deliveryDate;currency;totalAmount;notes;status;sapPONumber;sapPostMessage
+b1c2d3e4-f5a6-7890-bcde-f12345670001;REQ-260001;Pengadaan Laptop Kantor Jakarta;1710;1710;001;17300001;Wahyu Amaldi (Domestic Supplier);2026-04-01;2026-05-01;USD;3020.00;Untuk tim operasional Coffee Plant;D;;
+b1c2d3e4-f5a6-7890-bcde-f12345670002;REQ-260002;Pembelian Safety Equipment;1710;1710;001;17300002;Domestic US Supplier 2;2026-04-05;2026-05-05;USD;900.00;Untuk tim lapangan roasting plant;D;;
+b1c2d3e4-f5a6-7890-bcde-f12345670003;REQ-260003;Pengadaan Office Equipment;1710;1710;001;17258002;Domestic US JV Partner 1;2026-03-15;2026-04-15;USD;6040.00;Sudah diposting ke SAP;P;4500000099;PO berhasil dibuat di SAP

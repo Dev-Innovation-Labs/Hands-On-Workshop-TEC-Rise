@@ -1,0 +1,28 @@
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'TEC Rise - PO Request Item (Consumption)'
+@Metadata.allowExtensions: true
+define view entity ZC_TEC_POREQI
+  as projection on ZR_TEC_POREQI
+{
+  key ItemUUID,
+      RequestUUID,
+      RequestNo,
+      ItemNo,
+      MaterialNo,
+      Description,
+      Quantity,
+      UoM,
+      UnitPrice,
+      NetAmount,
+      Currency,
+      Plant,
+      MaterialGroup,
+
+      CreatedBy,
+      CreatedAt,
+      LastChangedBy,
+      LastChangedAt,
+      LocalLastChanged,
+
+      _PORequest : redirected to parent ZC_TEC_POREQ
+}

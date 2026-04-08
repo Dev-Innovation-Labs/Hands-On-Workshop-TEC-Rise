@@ -1,0 +1,47 @@
+{
+  "xsappname": "po-project",
+  "tenant-mode": "dedicated",
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.POManager",
+      "description": "Manage PO Requests"
+    },
+    {
+      "name": "$XSAPPNAME.POViewer",
+      "description": "View PO Requests"
+    }
+  ],
+  "role-templates": [
+    {
+      "name": "POManager",
+      "description": "Create, edit, and post PO Requests to SAP",
+      "scope-references": [
+        "$XSAPPNAME.POManager",
+        "$XSAPPNAME.POViewer"
+      ]
+    },
+    {
+      "name": "POViewer",
+      "description": "View PO Requests (read-only)",
+      "scope-references": [
+        "$XSAPPNAME.POViewer"
+      ]
+    }
+  ],
+  "role-collections": [
+    {
+      "name": "PO_Manager",
+      "description": "PO Request Manager — full access",
+      "role-template-references": [
+        "$XSAPPNAME.POManager"
+      ]
+    },
+    {
+      "name": "PO_Viewer",
+      "description": "PO Request Viewer — read only",
+      "role-template-references": [
+        "$XSAPPNAME.POViewer"
+      ]
+    }
+  ]
+}

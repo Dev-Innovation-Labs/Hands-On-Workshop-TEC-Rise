@@ -1,0 +1,48 @@
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'TEC Rise - PO Request (Consumption)'
+@Metadata.allowExtensions: true
+@Search.searchable: true
+@ObjectModel.semanticKey: ['RequestNo']
+define root view entity ZC_TEC_POREQ
+  provider contract transactional_query
+  as projection on ZR_TEC_POREQ
+{
+  key RequestUUID,
+
+      @Search.defaultSearchElement: true
+      RequestNo,
+
+      @Search.defaultSearchElement: true
+      Description,
+
+      CompanyCode,
+      PurchasingOrg,
+      PurchasingGroup,
+
+      @Search.defaultSearchElement: true
+      @ObjectModel.text.element: ['SupplierName']
+      Supplier,
+      SupplierName,
+
+      OrderDate,
+      DeliveryDate,
+      TotalAmount,
+      Currency,
+      Notes,
+
+      @Search.defaultSearchElement: true
+      Status,
+      StatusCriticality,
+
+      SAPPONumber,
+      SAPPostMessage,
+
+      CreatedBy,
+      CreatedAt,
+      LastChangedBy,
+      LastChangedAt,
+      LocalLastChanged,
+
+      // Composition redirect
+      _Items : redirected to composition child ZC_TEC_POREQI
+}

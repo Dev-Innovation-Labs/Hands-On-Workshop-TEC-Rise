@@ -1,0 +1,86 @@
+@Metadata.layer: #CUSTOMER
+@UI.headerInfo: {
+  typeName: 'Purchase Order Request',
+  typeNamePlural: 'Purchase Order Requests',
+  title: { type: #STANDARD, value: 'RequestNo' },
+  description: { type: #STANDARD, value: 'Description' }
+}
+annotate entity ZC_TEC_POREQ with
+{
+
+  @UI.facet: [
+    { id: 'General', purpose: #STANDARD, type: #IDENTIFICATION_REFERENCE, label: 'General', position: 10 },
+    { id: 'Items', purpose: #STANDARD, type: #LINEITEM_REFERENCE, label: 'Items', position: 20, targetElement: '_Items' },
+    { id: 'SAPIntegration', purpose: #STANDARD, type: #FIELDGROUP_REFERENCE, label: 'SAP Integration', position: 30, targetQualifier: 'SAPInfo' }
+  ]
+
+  @UI: {
+    selectionField: [{ position: 10 }],
+    lineItem: [{ position: 10 }],
+    identification: [{ position: 10 }]
+  }
+  RequestNo;
+
+  @UI: {
+    lineItem: [{ position: 20 }],
+    identification: [{ position: 20 }]
+  }
+  Description;
+
+  @UI: {
+    selectionField: [{ position: 20 }],
+    lineItem: [{ position: 30 }],
+    identification: [{ position: 30 }]
+  }
+  Supplier;
+
+  @UI.lineItem: [{ position: 35 }]
+  @UI.identification: [{ position: 35 }]
+  SupplierName;
+
+  @UI: {
+    lineItem: [{ position: 40, criticality: 'StatusCriticality' }],
+    selectionField: [{ position: 30 }],
+    identification: [{ position: 40, criticality: 'StatusCriticality' }]
+  }
+  Status;
+
+  @UI.lineItem: [{ position: 50 }]
+  @UI.identification: [{ position: 50 }]
+  TotalAmount;
+
+  @UI.identification: [{ position: 55 }]
+  Currency;
+
+  @UI.identification: [{ position: 60 }]
+  OrderDate;
+
+  @UI.identification: [{ position: 70 }]
+  DeliveryDate;
+
+  @UI.identification: [{ position: 80 }]
+  CompanyCode;
+
+  @UI.identification: [{ position: 85 }]
+  PurchasingOrg;
+
+  @UI.identification: [{ position: 86 }]
+  PurchasingGroup;
+
+  @UI.identification: [{ position: 90 }]
+  Notes;
+
+  @UI.lineItem: [{ position: 60 }]
+  @UI.fieldGroup: [{ qualifier: 'SAPInfo', position: 10 }]
+  SAPPONumber;
+
+  @UI.fieldGroup: [{ qualifier: 'SAPInfo', position: 20, criticality: 'StatusCriticality' }]
+  SAPPostMessage;
+
+  @UI.hidden: true
+  RequestUUID;
+
+  @UI.hidden: true
+  StatusCriticality;
+
+}

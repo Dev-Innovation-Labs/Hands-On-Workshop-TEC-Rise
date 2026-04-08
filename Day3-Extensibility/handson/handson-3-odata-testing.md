@@ -1,862 +1,646 @@
-# ✅ Hands-on 3: Fiori UI — Display & Posting Purchase Order — Hasil
-> **Author:** Wahyu Amaldi — Technical Lead SAP & Full Stack Development
+# Hands-on 3: Fiori UI, HANA Cloud & Post to SAP S/4HANA
 
-
-> **Status:** VERIFIED  
-> **Tanggal:** 7 April 2026  
-> **CDS Version:** @sap/cds v9.8.4
+> **Durasi:** ~45 menit  
+> **Prerequisite:** Hands-on 2 selesai (service + SAP client berjalan, `testSAPConnection` → ok)
 
 ---
 
 ## Tujuan
 
-Membangun **Fiori Elements UI** untuk Purchase Order system:
-- **List Report** — daftar semua PO dengan filter & sorting, status berwarna
-- **Object Page** — detail PO dengan header KPI, items table, notes
-- **Create Flow** — buat PO baru via Fiori UI dengan value help
-- **OData Testing** — CRUD + Actions via REST Client
+1. Membuat **Fiori Elements UI** (List Report + Object Page) dengan tombol "Post to SAP"
+2. **Deploy schema ke SAP HANA Cloud** — data persisten, bukan SQLite in-memory
+3. **Post PO ke SAP S/4HANA real** — mendapatkan SAP PO Number nyata
 
 ---
 
-## File yang Dibuat
+## Bagian A: Fiori Elements UI
 
-### File 1: `app/po/annotations.cds` — Fiori Annotations
+### Langkah 1: Buat CDS Annotations
+
+Buat file `app/po/annotations.cds`:
 
 ```cds
 using PurchaseOrderService as service from '../../srv/po-service';
 
 // ============================================
-// PURCHASE ORDERS — List Report
+// PO REQUESTS — List Report
 // ============================================
-annotate service.PurchaseOrders with @(
+annotate service.PORequests with @(
+
+    UI.SelectionFields: [
+        status, supplier, orderDate
+    ],
+
     UI.LineItem: [
+        { $Type: 'UI.DataField', Value: requestNo,    Label: 'Request No',     ![@UI.Importance]: #High },
+        { $Type: 'UI.DataField', Value: description,   Label: 'Description',    ![@UI.Importance]: #High },
+        { $Type: 'UI.DataField', Value: supplier,      Label: 'Supplier ID' },
+        { $Type: 'UI.DataField', Value: supplierName,  Label: 'Supplier Name' },
+        { $Type: 'UI.DataField', Value: status,        Label: 'Status',         Criticality: statusCriticality },
+        { $Type: 'UI.DataField', Value: totalAmount,   Label: 'Total Amount' },
+        { $Type: 'UI.DataField', Value: currency,      Label: 'Currency' },
+        { $Type: 'UI.DataField', Value: sapPONumber,   Label: 'SAP PO No' },
         {
-            $Type: 'UI.DataField',
-            Value: poNumber,
-            Label: 'PO Number',
+            $Type : 'UI.DataFieldForAction',
+            Action: 'PurchaseOrderService.postToSAP',
+            Label : '📤 Post to SAP',
             ![@UI.Importance]: #High
-        },
-        {
-            $Type: 'UI.DataField',
-            Value: description,
-            Label: 'Description',
-            ![@UI.Importance]: #High
-        },
-        {
-            $Type: 'UI.DataField',
-            Value: supplier.name,
-            Label: 'Supplier'
-        },
-        {
-            $Type: 'UI.DataField',
-            Value: status,
-            Label: 'Status',
-            Criticality: statusCriticality
-        },
-        {
-            $Type: 'UI.DataField',
-            Value: orderDate,
-            Label: 'Order Date'
-        },
-        {
-            $Type: 'UI.DataField',
-            Value: totalAmount,
-            Label: 'Total Amount'
-        },
-        {
-            $Type: 'UI.DataField',
-            Value: currency_code,
-            Label: 'Currency'
         }
     ],
 
-    UI.SelectionFields: [
-        status,
-        supplier_ID,
-        orderDate
-    ],
-
     UI.PresentationVariant: {
-        SortOrder: [{
-            Property: poNumber,
-            Descending: true
-        }]
+        SortOrder: [{ Property: requestNo, Descending: true }]
     }
 );
 
 // ============================================
-// PURCHASE ORDERS — Object Page Header
+// PO REQUESTS — Object Page Header
 // ============================================
-annotate service.PurchaseOrders with @(
+annotate service.PORequests with @(
+
     UI.HeaderInfo: {
-        TypeName       : 'Purchase Order',
-        TypeNamePlural : 'Purchase Orders',
-        Title          : { $Type: 'UI.DataField', Value: poNumber },
+        TypeName       : 'PO Request',
+        TypeNamePlural : 'PO Requests',
+        Title          : { $Type: 'UI.DataField', Value: requestNo },
         Description    : { $Type: 'UI.DataField', Value: description }
     },
 
     UI.HeaderFacets: [
-        {
-            $Type  : 'UI.ReferenceFacet',
-            Target : '@UI.FieldGroup#Status',
-            Label  : 'Status'
-        },
-        {
-            $Type  : 'UI.ReferenceFacet',
-            Target : '@UI.DataPoint#TotalAmount',
-            Label  : 'Total'
-        }
+        { $Type: 'UI.ReferenceFacet', Target: '@UI.DataPoint#Status' },
+        { $Type: 'UI.ReferenceFacet', Target: '@UI.DataPoint#TotalAmount' },
+        { $Type: 'UI.ReferenceFacet', Target: '@UI.DataPoint#SAPPONumber' }
     ],
 
-    UI.DataPoint #TotalAmount: {
-        Value : totalAmount,
-        Title : 'Total Amount'
-    },
+    UI.DataPoint #Status:      { Value: status, Title: 'Status', Criticality: statusCriticality },
+    UI.DataPoint #TotalAmount: { Value: totalAmount, Title: 'Total Amount' },
+    UI.DataPoint #SAPPONumber: { Value: sapPONumber, Title: 'SAP PO Number' },
 
-    UI.FieldGroup #Status: {
-        Data: [
-            { Value: status,    Label: 'Status' },
-            { Value: orderDate, Label: 'Order Date' }
-        ]
-    }
+    // POST TO SAP button di Object Page
+    UI.Identification: [
+        {
+            $Type : 'UI.DataFieldForAction',
+            Action: 'PurchaseOrderService.postToSAP',
+            Label : '📤 Post to SAP'
+        }
+    ]
 );
 
 // ============================================
-// PURCHASE ORDERS — Object Page Sections
+// PO REQUESTS — Object Page Sections
 // ============================================
-annotate service.PurchaseOrders with @(
+annotate service.PORequests with @(
+
     UI.Facets: [
         {
-            $Type  : 'UI.ReferenceFacet',
-            ID     : 'GeneralInfo',
-            Label  : 'General Information',
-            Target : '@UI.FieldGroup#GeneralInfo'
+            $Type: 'UI.ReferenceFacet', Label: 'General Information',
+            ID: 'GeneralInfo', Target: '@UI.FieldGroup#GeneralInfo'
         },
         {
-            $Type  : 'UI.ReferenceFacet',
-            ID     : 'POItems',
-            Label  : 'Items',
-            Target : 'items/@UI.LineItem'
+            $Type: 'UI.ReferenceFacet', Label: 'SAP Organization',
+            ID: 'SAPOrg', Target: '@UI.FieldGroup#SAPOrg'
         },
         {
-            $Type  : 'UI.ReferenceFacet',
-            ID     : 'Notes',
-            Label  : 'Notes',
-            Target : '@UI.FieldGroup#Notes'
+            $Type: 'UI.ReferenceFacet', Label: 'Items',
+            ID: 'Items', Target: 'items/@UI.LineItem'
+        },
+        {
+            $Type: 'UI.ReferenceFacet', Label: 'SAP Integration Status',
+            ID: 'SAPStatus', Target: '@UI.FieldGroup#SAPStatus'
         }
     ],
 
     UI.FieldGroup #GeneralInfo: {
-        Label: 'General Information',
-        Data : [
-            { Value: poNumber,     Label: 'PO Number'     },
-            { Value: description,  Label: 'Description'   },
-            { Value: supplier_ID,  Label: 'Supplier'      },
-            { Value: status,       Label: 'Status'        },
-            { Value: orderDate,    Label: 'Order Date'    },
-            { Value: deliveryDate, Label: 'Delivery Date' },
-            { Value: totalAmount,  Label: 'Total Amount'  },
-            { Value: currency_code,Label: 'Currency'      }
+        Data: [
+            { $Type: 'UI.DataField', Value: requestNo,    Label: 'Request No' },
+            { $Type: 'UI.DataField', Value: description,   Label: 'Description' },
+            { $Type: 'UI.DataField', Value: supplier,      Label: 'Supplier ID' },
+            { $Type: 'UI.DataField', Value: supplierName,  Label: 'Supplier Name' },
+            { $Type: 'UI.DataField', Value: orderDate,     Label: 'Order Date' },
+            { $Type: 'UI.DataField', Value: deliveryDate,  Label: 'Delivery Date' },
+            { $Type: 'UI.DataField', Value: currency,      Label: 'Currency' },
+            { $Type: 'UI.DataField', Value: totalAmount,   Label: 'Total Amount' },
+            { $Type: 'UI.DataField', Value: notes,         Label: 'Notes' }
         ]
     },
 
-    UI.FieldGroup #Notes: {
-        Label: 'Notes',
+    UI.FieldGroup #SAPOrg: {
         Data: [
-            { Value: notes }
+            { $Type: 'UI.DataField', Value: companyCode,     Label: 'Company Code' },
+            { $Type: 'UI.DataField', Value: purchasingOrg,   Label: 'Purchasing Org' },
+            { $Type: 'UI.DataField', Value: purchasingGroup, Label: 'Purchasing Group' }
+        ]
+    },
+
+    UI.FieldGroup #SAPStatus: {
+        Data: [
+            { $Type: 'UI.DataField', Value: status,         Label: 'Status', Criticality: statusCriticality },
+            { $Type: 'UI.DataField', Value: sapPONumber,    Label: 'SAP PO Number' },
+            { $Type: 'UI.DataField', Value: sapPostDate,    Label: 'Posted at' },
+            { $Type: 'UI.DataField', Value: sapPostMessage, Label: 'SAP Response' }
         ]
     }
 );
 
-// Status & Criticality
-annotate service.PurchaseOrders with {
-    status @Common.ValueListWithFixedValues;
-    statusCriticality @UI.Hidden;
-};
-
 // ============================================
-// PURCHASE ORDER ITEMS — Table in Object Page
+// PO REQUEST ITEMS — Table in Object Page
 // ============================================
-annotate service.PurchaseOrderItems with @(
+annotate service.PORequestItems with @(
     UI.LineItem: [
-        { Value: itemNo,                Label: 'Item'        },
-        { Value: material.description,  Label: 'Material'    },
-        { Value: description,           Label: 'Description' },
-        { Value: quantity,              Label: 'Quantity'    },
-        { Value: uom,                  Label: 'UoM'         },
-        { Value: unitPrice,            Label: 'Unit Price'  },
-        { Value: netAmount,            Label: 'Net Amount'  },
-        { Value: currency_code,        Label: 'Currency'    }
-    ]
-);
-
-annotate service.PurchaseOrderItems with @(
+        { $Type: 'UI.DataField', Value: itemNo,        Label: 'Item' },
+        { $Type: 'UI.DataField', Value: materialNo,    Label: 'Material' },
+        { $Type: 'UI.DataField', Value: description,    Label: 'Description' },
+        { $Type: 'UI.DataField', Value: quantity,       Label: 'Qty' },
+        { $Type: 'UI.DataField', Value: uom,            Label: 'UoM' },
+        { $Type: 'UI.DataField', Value: unitPrice,      Label: 'Unit Price' },
+        { $Type: 'UI.DataField', Value: netAmount,      Label: 'Net Amount' },
+        { $Type: 'UI.DataField', Value: currency,       Label: 'Curr' },
+        { $Type: 'UI.DataField', Value: plant,          Label: 'Plant' },
+        { $Type: 'UI.DataField', Value: materialGroup,  Label: 'Mat. Group' }
+    ],
     UI.HeaderInfo: {
-        TypeName       : 'PO Item',
-        TypeNamePlural : 'PO Items'
-    },
-    UI.Facets: [{
-        $Type  : 'UI.ReferenceFacet',
-        Label  : 'Item Details',
-        Target : '@UI.FieldGroup#ItemDetails'
-    }],
-    UI.FieldGroup #ItemDetails: {
-        Data: [
-            { Value: itemNo,      Label: 'Item Number'  },
-            { Value: material_ID, Label: 'Material'     },
-            { Value: description, Label: 'Description'  },
-            { Value: quantity,    Label: 'Quantity'     },
-            { Value: uom,        Label: 'UoM'          },
-            { Value: unitPrice,  Label: 'Unit Price'   },
-            { Value: netAmount,  Label: 'Net Amount'   }
-        ]
+        TypeName: 'Item', TypeNamePlural: 'Items'
     }
-);
-
-// ============================================
-// VALUE HELPS (Dropdown)
-// ============================================
-annotate service.PurchaseOrders with {
-    supplier @Common.ValueList: {
-        CollectionPath: 'Suppliers',
-        Parameters: [
-            { $Type: 'Common.ValueListParameterOut',         LocalDataProperty: supplier_ID, ValueListProperty: 'ID' },
-            { $Type: 'Common.ValueListParameterDisplayOnly', ValueListProperty: 'supplierNo' },
-            { $Type: 'Common.ValueListParameterDisplayOnly', ValueListProperty: 'name' },
-            { $Type: 'Common.ValueListParameterDisplayOnly', ValueListProperty: 'city' }
-        ]
-    };
-};
-
-annotate service.PurchaseOrderItems with {
-    material @Common.ValueList: {
-        CollectionPath: 'Materials',
-        Parameters: [
-            { $Type: 'Common.ValueListParameterOut',         LocalDataProperty: material_ID, ValueListProperty: 'ID' },
-            { $Type: 'Common.ValueListParameterDisplayOnly', ValueListProperty: 'materialNo' },
-            { $Type: 'Common.ValueListParameterDisplayOnly', ValueListProperty: 'description' },
-            { $Type: 'Common.ValueListParameterDisplayOnly', ValueListProperty: 'unitPrice' }
-        ]
-    };
-};
-
-// ============================================
-// MEASURES & LABELS
-// ============================================
-annotate service.PurchaseOrders with {
-    totalAmount  @Measures.ISOCurrency: currency_code;
-};
-annotate service.PurchaseOrderItems with {
-    unitPrice  @Measures.ISOCurrency: currency_code;
-    netAmount  @Measures.ISOCurrency: currency_code;
-};
-
-// ============================================
-// SUPPLIERS & MATERIALS — List Report Labels
-// ============================================
-annotate service.Suppliers with @(
-    UI.LineItem: [
-        { Value: supplierNo, Label: 'Supplier No' },
-        { Value: name,       Label: 'Name'        },
-        { Value: city,       Label: 'City'        },
-        { Value: country,    Label: 'Country'     },
-        { Value: isActive,   Label: 'Active'      }
-    ]
-);
-
-annotate service.Materials with @(
-    UI.LineItem: [
-        { Value: materialNo,  Label: 'Material No' },
-        { Value: description, Label: 'Description' },
-        { Value: category,    Label: 'Category'    },
-        { Value: uom,         Label: 'UoM'         },
-        { Value: unitPrice,   Label: 'Unit Price'  }
-    ]
 );
 ```
 
-### File 2: `app/po/webapp/manifest.json` — App Descriptor
+### Langkah 2: Buat Fiori Web App Files
+
+**File: `app/po/webapp/manifest.json`**
 
 ```json
 {
-    "_version": "1.49.0",
+    "_version": "1.59.0",
     "sap.app": {
         "id": "com.tecrise.po",
         "type": "application",
-        "title": "Purchase Orders",
-        "description": "Manage Purchase Orders",
+        "title": "PO Request — Post to SAP",
+        "description": "Side-by-Side Extension: Z-table → SAP S/4HANA",
         "applicationVersion": { "version": "1.0.0" },
         "dataSources": {
             "mainService": {
-                "uri": "/po/",
+                "uri": "/odata/v4/po/",
                 "type": "OData",
-                "settings": {
-                    "odataVersion": "4.0"
-                }
+                "settings": { "odataVersion": "4.0" }
             }
         }
     },
     "sap.ui5": {
-        "routing": {
-            "routes": [
-                {
-                    "name": "POList",
-                    "pattern": "",
-                    "target": "POList"
-                },
-                {
-                    "name": "PODetail",
-                    "pattern": "PurchaseOrders({key})",
-                    "target": "PODetail"
-                }
-            ],
-            "targets": {
-                "POList": {
-                    "type": "Component",
-                    "id": "POList",
-                    "name": "sap.fe.templates.ListReport",
-                    "options": {
-                        "settings": {
-                            "entitySet": "PurchaseOrders",
-                            "initialLoad": "Enabled",
-                            "navigation": {
-                                "PurchaseOrders": {
-                                    "detail": { "route": "PODetail" }
-                                }
-                            }
-                        }
-                    }
-                },
-                "PODetail": {
-                    "type": "Component",
-                    "id": "PODetail",
-                    "name": "sap.fe.templates.ObjectPage",
-                    "options": {
-                        "settings": {
-                            "entitySet": "PurchaseOrders",
-                            "editableHeaderContent": false
-                        }
-                    }
-                }
+        "dependencies": {
+            "minUI5Version": "1.120.0",
+            "libs": {
+                "sap.m": {},
+                "sap.ui.core": {},
+                "sap.ushell": {},
+                "sap.fe.templates": {}
             }
         },
         "models": {
             "": {
                 "dataSource": "mainService",
-                "settings": { "synchronizationMode": "None" }
+                "preload": true,
+                "settings": {
+                    "synchronizationMode": "None",
+                    "operationMode": "Server",
+                    "autoExpandSelect": true,
+                    "earlyRequests": true
+                }
+            }
+        },
+        "routing": {
+            "routes": [
+                {
+                    "pattern": ":?query:",
+                    "name": "PORequestsList",
+                    "target": "PORequestsList"
+                },
+                {
+                    "pattern": "PORequests({key}):?query:",
+                    "name": "PORequestsObjectPage",
+                    "target": "PORequestsObjectPage"
+                }
+            ],
+            "targets": {
+                "PORequestsList": {
+                    "type": "Component",
+                    "id": "PORequestsList",
+                    "name": "sap.fe.templates.ListReport",
+                    "options": {
+                        "settings": {
+                            "contextPath": "/PORequests",
+                            "variantManagement": "Page",
+                            "initialLoad": "Enabled",
+                            "navigation": {
+                                "PORequests": {
+                                    "detail": { "route": "PORequestsObjectPage" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "PORequestsObjectPage": {
+                    "type": "Component",
+                    "id": "PORequestsObjectPage",
+                    "name": "sap.fe.templates.ObjectPage",
+                    "options": {
+                        "settings": {
+                            "contextPath": "/PORequests",
+                            "editableHeaderContent": false
+                        }
+                    }
+                }
             }
         }
     }
 }
 ```
 
----
+**File: `app/po/webapp/Component.js`**
 
-## Verifikasi Fiori UI
+```javascript
+sap.ui.define(["sap/fe/core/AppComponent"], function (AppComponent) {
+    "use strict";
+    return AppComponent.extend("com.tecrise.po.Component", {
+        metadata: { manifest: "json" }
+    });
+});
+```
 
-### Langkah 1: Jalankan
+**File: `app/po/webapp/index.html`**
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PO Request — Post to SAP</title>
+    <script id="sap-ui-bootstrap"
+        src="https://sapui5.hana.ondemand.com/resources/sap-ui-core.js"
+        data-sap-ui-theme="sap_horizon"
+        data-sap-ui-resourceroots='{"com.tecrise.po": "./"}'
+        data-sap-ui-compatVersion="edge"
+        data-sap-ui-async="true"
+        data-sap-ui-frameOptions="allow"
+    ></script>
+    <script>
+        sap.ui.require(["sap/fe/core/ComponentContainer"], function (ComponentContainer) {
+            new ComponentContainer({
+                name: "com.tecrise.po",
+                settings: {},
+                async: true,
+                height: "100%"
+            }).placeAt("content");
+        });
+    </script>
+</head>
+<body class="sapUiBody" id="content"></body>
+</html>
+```
+
+### Langkah 3: Verifikasi Fiori UI
 
 ```bash
-$ cds watch
+cds watch
 ```
 
-**✅ Output:**
+Buka browser: **http://localhost:4004/po/webapp/index.html**
+
+**Yang harus terlihat:**
+1. **List Report** — Tabel dengan 3 PO Requests dari sample data
+2. **Filter bar** — Filter by Status, Supplier, Order Date
+3. **Tombol "📤 Post to SAP"** — Di kolom tabel (per baris)
+4. **Klik baris** → **Object Page** dengan:
+   - Header: Request No, Status (warna), Total Amount, SAP PO Number
+   - Section: General Info, SAP Organization, Items table, SAP Integration Status
+   - Tombol "📤 Post to SAP" di header Object Page
+
+---
+
+## Bagian B: Deploy ke SAP HANA Cloud
+
+### Prerequisite HANA Cloud
+
+- SAP BTP Trial account dengan HANA Cloud instance (hana-free)
+- CF CLI logged in: `cf login -a https://api.cf.ap21.hana.ondemand.com`
+- HANA Cloud instance harus **Running** (BTP Trial auto-stop setelah idle)
+
+### Langkah 4: Pastikan HANA Cloud Running
+
+```bash
+# Cek status
+cf service Dev-hana
+
+# Jika stopped, start:
+cf update-service Dev-hana -c '{"data":{"serviceStopped":false}}'
+
+# Tunggu sampai "update succeeded" (5-15 menit)
+cf service Dev-hana | grep status
 ```
-[cds] - serving PurchaseOrderService { at: ['/odata/v4/po'] }
+
+### Langkah 5: Buat HDI Container
+
+```bash
+cf create-service hana hdi-shared po-project-db
+
+# Tunggu sampai "create succeeded"
+cf service po-project-db
+```
+
+### Langkah 6: Allow External IP (untuk deploy dari lokal)
+
+```bash
+# Agar laptop bisa connect ke HANA Cloud
+cf update-service Dev-hana -c '{"data":{"whitelistIPs":["0.0.0.0/0"]}}'
+
+# Tunggu sampai "update succeeded"
+cf service Dev-hana | grep status
+```
+
+### Langkah 7: Deploy Schema ke HANA
+
+```bash
+cd Day3-Extensibility/po-project
+
+# Deploy — ini akan: build HANA artifacts → create service key → deploy tables + CSV data
+cds deploy --to hana
+```
+
+**Expected output:**
+```
+building project...
+done > wrote output to:
+   gen/db/src/gen/com.tecrise.procurement.PORequests.hdbtable
+   gen/db/src/gen/com.tecrise.procurement.PORequestItems.hdbtable
+   ...
+
+using container po-project-db
+starting deployment to SAP HANA ...
+
+Inserted 3 records ... into COM_TECRISE_PROCUREMENT_POREQUESTS
+Inserted 4 records ... into COM_TECRISE_PROCUREMENT_POREQUESTITEMS
+
+Make succeeded: 11 files deployed
+
+binding db to Cloud Foundry managed service po-project-db
+saving bindings to .cdsrc-private.json in profile hybrid
+
+successfully finished deployment
+```
+
+> `cds deploy --to hana` otomatis membuat `.cdsrc-private.json` dengan binding credentials untuk hybrid profile.
+
+### Langkah 8: Jalankan Hybrid Mode
+
+```bash
+cds watch --profile hybrid
+```
+
+**Expected output:**
+```
+resolving cloud service bindings...
+bound db to cf managed service po-project-db:po-project-db-key
+
+[cds] - connect to db > hana {
+  host: '...hana.prod-ap21.hanacloud.ondemand.com',
+  port: '443',
+  schema: 'F6AC7A7E...'
+}
+[SAP] Client configured → https://sap.ilmuprogram.com (client 777)
+
 [cds] - server listening on { url: 'http://localhost:4004' }
 ```
 
-Buka: `http://localhost:4004` → klik link **Purchase Orders** (atau `/po/webapp/index.html`)
+Node.js jalan **lokal**, tapi database sudah **HANA Cloud**. Data persisten — restart server tidak hilang.
+
+### Langkah 9: Verifikasi Data dari HANA
+
+```bash
+curl -s http://localhost:4004/po/PORequests | python3 -m json.tool
+```
+
+**Harus mengembalikan 3 records** yang sama — sekarang datanya dari HANA Cloud, bukan SQLite!
+
+### Langkah 9b: Browse HANA Cloud via DBeaver (Optional)
+
+Selain verifikasi via OData/curl, kita bisa melihat tabel HANA Cloud langsung menggunakan **DBeaver** — database tool gratis yang mendukung SAP HANA.
+
+#### 1. Install DBeaver
+
+Download dari [https://dbeaver.io/download/](https://dbeaver.io/download/) → pilih **Community Edition** (gratis).
+
+#### 2. Ambil Credentials HANA
+
+Jalankan di terminal (pastikan sudah `cf login`):
+
+```bash
+cf service-key po-project-db po-project-db-key
+```
+
+Catat nilai berikut dari output JSON:
+
+| Field | Contoh Nilai |
+|:------|:-------------|
+| `host` | `0536a7f6-2846-40e6-baf7-171fcf1ae66c.hana.prod-ap21.hanacloud.ondemand.com` |
+| `port` | `443` |
+| `schema` | `F6AC7A7E7DCE4998A28129271B5F644F` |
+| `user` | `F6AC7A7E7DCE4998A28129271B5F644F_CHVKIVRAD04MPQUPWMY9NF2MK_RT` |
+| `password` | *(dari field `password` di output JSON)* |
+
+#### 3. Buat Connection di DBeaver
+
+1. Buka DBeaver → **Database** → **New Database Connection** (atau klik icon colokan `+`)
+2. Cari **SAP HANA** → pilih → klik **Next**
+3. Jika DBeaver meminta download HANA JDBC driver, klik **Download** → tunggu selesai
+4. Isi connection details:
+
+| Field | Nilai |
+|:------|:------|
+| **Host** | `0536a7f6-2846-40e6-baf7-171fcf1ae66c.hana.prod-ap21.hanacloud.ondemand.com` |
+| **Port** | `443` |
+| **Database/Schema** | `F6AC7A7E7DCE4998A28129271B5F644F` |
+| **User** | *(dari `cf service-key` — field `user`)* |
+| **Password** | *(dari `cf service-key` — field `password`)* |
+
+5. Klik tab **Driver properties** → pastikan:
+
+| Property | Value |
+|:---------|:------|
+| `encrypt` | `true` |
+| `validateCertificate` | `true` |
+
+6. Klik **Test Connection** → harus muncul **"Connected"**
+7. Klik **Finish**
+
+#### 4. Browse Tabel
+
+Setelah connected, navigasi di panel kiri:
+
+```
+po-project-db
+ └── Schemas
+      └── F6AC7A7E7DCE4998A28129271B5F644F
+           └── Tables
+                ├── COM_TECRISE_PROCUREMENT_POREQUESTS        (3 rows)
+                ├── COM_TECRISE_PROCUREMENT_POREQUESTITEMS     (4 rows)
+                └── CDS_OUTBOX_MESSAGES                        (0 rows)
+```
+
+- **Double-click** tabel → buka tab **Data** untuk lihat isi rows
+- Atau klik kanan tabel → **View Data** → melihat data langsung
+
+#### 5. Jalankan SQL Query (Optional)
+
+Buka **SQL Editor** (klik kanan connection → **SQL Editor** → **New SQL Script**):
+
+```sql
+-- Lihat semua PO Requests
+SELECT * FROM "COM_TECRISE_PROCUREMENT_POREQUESTS";
+
+-- Lihat items beserta header-nya
+SELECT r."REQUESTNO", r."DESCRIPTION", r."STATUS",
+       i."MATERIALNO", i."DESCRIPTION" AS "ITEM_DESC", i."QUANTITY", i."NETAMOUNT"
+FROM "COM_TECRISE_PROCUREMENT_POREQUESTS" r
+JOIN "COM_TECRISE_PROCUREMENT_POREQUESTITEMS" i
+  ON r."ID" = i."PARENT_ID";
+
+-- Cek PO yang sudah di-post ke SAP
+SELECT "REQUESTNO", "SAPPONUMBER", "SAPPOSTDATE"
+FROM "COM_TECRISE_PROCUREMENT_POREQUESTS"
+WHERE "STATUS" = 'P';
+```
+
+> **Tips:** DBeaver juga bisa digunakan untuk memonitor data setelah Post to SAP — refresh tabel untuk melihat status berubah dari `D` ke `P` dan kolom `SAP_PO_NUMBER` terisi.
 
 ---
 
-### Verifikasi List Report Page
+## Bagian C: Post PO ke SAP S/4HANA Real
 
-**URL:** `http://localhost:4004/po/webapp/index.html#/`
+### Langkah 10: Post via curl
 
-**✅ Tampilan yang diharapkan:**
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Purchase Orders                                    [Create] [⚙]│
-├─────────────────────────────────────────────────────────────────┤
-│  Status: [All  ▼]   Supplier: [        ▼]   Order Date: [    ] │
-│                                                          [Go]   │
-├─────────────────────────────────────────────────────────────────┤
-│  PO Number  │ Description              │ Supplier        │ St. │
-├─────────────┼──────────────────────────┼─────────────────┼─────┤
-│  PO-240004  │ Pengadaan Electrical...  │ PT Global Parts │ 🔵 D│
-│  PO-240003  │ Restock Lubricants...    │ CV Mitra Log.   │ 🟠 O│
-│  PO-240002  │ Pembelian Safety Eq...   │ PT Kimia Farma  │ 🟢 A│
-│  PO-240001  │ Pengadaan Spare Pa...    │ PT Baja Nusan.  │ 🔵 P│
-├─────────────┼──────────────────────────┼─────────────────┼─────┤
-│             │ Order Date  │ Total Amount  │ Currency      │     │
-│             │ 2024-03-20  │ 0.00          │ IDR           │     │
-│             │ 2024-03-10  │ 1,800,000.00  │ IDR           │     │
-│             │ 2024-02-01  │ 570,000.00    │ IDR           │     │
-│             │ 2024-01-15  │ 1,295,000.00  │ IDR           │     │
-└─────────────────────────────────────────────────────────────────┘
+```bash
+# Post REQ-260001 ke SAP (pastikan server hybrid masih jalan)
+curl -s -X POST \
+  "http://localhost:4004/po/PORequests(b1c2d3e4-f5a6-7890-bcde-f12345670001)/PurchaseOrderService.postToSAP" \
+  -H "Content-Type: application/json" \
+  -d '{}' | python3 -m json.tool
 ```
 
-**Verifikasi:**
-- ✅ Tabel menampilkan 4 PO dari CSV seed data
-- ✅ Default sort: poNumber descending (PO-240004 di atas)
-- ✅ Filter bar: Status, Supplier, Order Date
-- ✅ Status column berwarna (Criticality): D=abu, O=orange, A=hijau, P=abu
-- ✅ Tombol **[Create]** tersedia di toolbar
-- ✅ Klik baris → navigasi ke Object Page
+**Expected result:**
+```json
+{
+    "sapPONumber": "4500000016",
+    "status": "Posted",
+    "message": "PO 4500000016 berhasil dibuat di SAP S/4HANA"
+}
+```
+
+### Langkah 11: Post via Fiori UI
+
+1. Buka **http://localhost:4004/po/webapp/index.html**
+2. Pilih PO Request dengan status **Draft** (D)
+3. Klik tombol **"📤 Post to SAP"**
+4. Tunggu — UI akan auto-refresh
+5. Kolom **SAP PO No** akan terisi (e.g., `4500000017`)
+6. Status berubah menjadi **P** (hijau)
+
+### Langkah 12: Verifikasi di SAP S/4HANA
+
+PO yang dibuat bisa dicek langsung di SAP:
+
+```bash
+# Cek PO di SAP via OData
+curl -sk "https://wahyu.amaldi:Pas671_ok12345@sap.ilmuprogram.com/sap/opu/odata/sap/C_PURCHASEORDER_FS_SRV/C_PurchaseOrderFs('4500000016')?\$format=json&sap-client=777" | python3 -m json.tool
+```
+
+Atau login ke SAP GUI → Transaction `ME23N` → Masukkan PO Number.
 
 ---
 
-### Verifikasi Object Page
-
-**URL:** Klik PO-240001 di list → `#/PurchaseOrders(b1c2d3e4-...)`
-
-**✅ Tampilan yang diharapkan:**
+## Struktur Project Final
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  ← Purchase Orders                                              │
+po-project/
+├── package.json              ← Multi-profile DB config
+├── .env                      ← SAP credentials
+├── .cdsrc-private.json       ← HANA binding (auto-generated)
+├── db/
+│   ├── po-schema.cds         ← CDS data model (Z-table)
+│   └── data/                 ← CSV seed data
+├── srv/
+│   ├── po-service.cds        ← Service + postToSAP action
+│   ├── po-service.js         ← Handlers + business logic
+│   └── lib/
+│       └── sap-client.js     ← SAP OData V2 client (draft flow)
+├── app/
+│   └── po/
+│       ├── annotations.cds   ← Fiori Elements annotations
+│       └── webapp/
+│           ├── manifest.json  ← App routing config
+│           ├── Component.js   ← UI5 component
+│           └── index.html     ← Entry point
+├── gen/                       ← Build output (HANA artifacts)
+├── mta.yaml                  ← MTA descriptor (production deploy)
+└── xs-security.json          ← XSUAA roles (POManager, POViewer)
+```
+
+---
+
+## End-to-End Flow Summary
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    BTP (Side-by-Side Extension)                   │
 │                                                                  │
-│  PO-240001                                         [Edit]        │
-│  Pengadaan Spare Parts Q1                                        │
-│  ┌──────────────┐  ┌───────────────────┐                         │
-│  │ Status: P    │  │ Total: 1,295,000  │                         │
-│  │ Date: 15 Jan │  │ IDR               │                         │
-│  └──────────────┘  └───────────────────┘                         │
-├──────────────────────────────────────────────────────────────────┤
-│  General Information                                             │
-│  ┌────────────────┬─────────────────────────────────────────┐    │
-│  │ PO Number:     │ PO-240001                               │    │
-│  │ Description:   │ Pengadaan Spare Parts Q1                │    │
-│  │ Supplier:      │ PT Baja Nusantara                       │    │
-│  │ Status:        │ P (Posted)                              │    │
-│  │ Order Date:    │ Jan 15, 2024                            │    │
-│  │ Delivery Date: │ Feb 15, 2024                            │    │
-│  │ Total Amount:  │ 1,295,000.00 IDR                        │    │
-│  └────────────────┴─────────────────────────────────────────┘    │
-├──────────────────────────────────────────────────────────────────┤
-│  Items                                              [+ Add Row]  │
-│  ┌──────┬────────────────────┬──────┬────────┬──────────────┐    │
-│  │ Item │ Material           │ Qty  │ Price  │ Net Amount   │    │
-│  ├──────┼────────────────────┼──────┼────────┼──────────────┤    │
-│  │ 10   │ Bearing SKF 6205   │ 5    │125,000 │ 625,000      │    │
-│  │ 20   │ V-Belt Type B68    │ 4    │ 85,000 │ 340,000      │    │
-│  │ 30   │ Welding Rod E6013  │ 2    │ 95,000 │ 190,000      │    │
-│  │ 40   │ Glove Latex Ind.   │ 3    │ 45,000 │ 135,000      │    │
-│  └──────┴────────────────────┴──────┴────────┴──────────────┘    │
-├──────────────────────────────────────────────────────────────────┤
-│  Notes                                                           │
-│  ┌──────────────────────────────────────────────────────────┐    │
-│  │ Urgent untuk maintenance shutdown                         │    │
-│  └──────────────────────────────────────────────────────────┘    │
+│  Fiori UI ──▶ CAP Service ──▶ HANA Cloud (Z-table)              │
+│  (List Report)  (po-service.js)  (PORequests + Items)            │
+│                      │                                           │
+│                      │ postToSAP()                               │
+│                      ▼                                           │
+│               SAP OData V2 Client                                │
+│               (sap-client.js)                                    │
+│                      │                                           │
+└──────────────────────┼───────────────────────────────────────────┘
+                       │ HTTPS (OData V2)
+                       ▼
+┌──────────────────────────────────────────────────────────────────┐
+│              SAP S/4HANA (sap.ilmuprogram.com)                   │
+│                                                                  │
+│  MM_PUR_PO_MAINT_V2_SRV                                         │
+│  Draft → Items → Prepare → Activate → PO 4500000016             │
+│                                                                  │
+│  Company Code 1710 (Andi Coffee) | Plant 1710                    │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-**Verifikasi:**
-- ✅ Header menampilkan PO Number, Description, Status, Total Amount
-- ✅ Section "General Information" — semua field PO
-- ✅ Section "Items" — tabel 4 items dengan material name, qty, price, net amount
-- ✅ Section "Notes" — catatan PO
-- ✅ Tombol **[Edit]** untuk PO yang status Draft/Open
+---
+
+## Checkpoint Final
+
+| # | Cek | Status |
+|:--|:----|:-------|
+| 1 | Fiori UI tampil di `http://localhost:4004/po/webapp/index.html` | ☐ |
+| 2 | List Report menampilkan 3 PO Requests | ☐ |
+| 3 | Object Page menampilkan header + 4 sections + items table | ☐ |
+| 4 | HANA Cloud: `cds watch --profile hybrid` → `connect to db > hana` | ☐ |
+| 5 | Data persisten di HANA (restart server → data masih ada) | ☐ |
+| 6 | Post to SAP → mendapat SAP PO Number nyata (e.g., 4500000016) | ☐ |
+| 7 | Status berubah dari D (kuning) → P (hijau) setelah posting | ☐ |
+| 8 | PO bisa diverifikasi di SAP S/4HANA (ME23N atau OData) | ☐ |
 
 ---
 
-### Verifikasi Create PO Flow
+## Troubleshooting
 
-**Langkah:** Dari List Report, klik **[Create]**
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│  New: Purchase Order                        [Save] [Cancel]   │
-│                                                               │
-│  General Information                                          │
-│  ┌────────────────┬──────────────────────────────────────┐   │
-│  │ Description:   │ [________________________]           │   │
-│  │ Supplier:      │ [_______________ 🔍]  ← Value Help   │   │
-│  │ Order Date:    │ [📅 2024-04-07]                      │   │
-│  │ Delivery Date: │ [📅 ____________]                    │   │
-│  │ Currency:      │ [IDR ▼]                              │   │
-│  └────────────────┴──────────────────────────────────────┘   │
-│                                                               │
-│  Notes                                                        │
-│  ┌──────────────────────────────────────────────────────────┐│
-│  │ [                                                        ]││
-│  └──────────────────────────────────────────────────────────┘│
-└──────────────────────────────────────────────────────────────┘
-```
-
-**Value Help — Supplier (klik 🔍):**
-
-```
-┌────────────────────────────────────────────────────┐
-│  Select Supplier                          [Select] │
-│  ┌──────────┬────────────────────────┬───────────┐ │
-│  │ Supp. No │ Name                   │ City      │ │
-│  ├──────────┼────────────────────────┼───────────┤ │
-│  │ SUP-001  │ PT Baja Nusantara      │ Cikarang  │ │
-│  │ SUP-002  │ CV Mitra Logistik      │ Surabaya  │ │
-│  │ SUP-003  │ PT Kimia Farma Supply  │ Jakarta   │ │
-│  │ SUP-004  │ UD Sumber Makmur       │ Semarang  │ │
-│  │ SUP-005  │ PT Global Parts Indo.  │ Jakarta   │ │
-│  └──────────┴────────────────────────┴───────────┘ │
-└────────────────────────────────────────────────────┘
-```
-
-**✅ Setelah Save:**
-- PO tersimpan dengan `poNumber` auto-generated (misal: PO-260005)
-- Status default: "O" (Open)
-- Navigasi otomatis ke Object Page PO yang baru dibuat
-- Di Object Page, klik **[Add Row]** di section Items untuk tambah items
+| Problem | Solution |
+|:--------|:---------|
+| HANA Cloud stopped | `cf update-service Dev-hana -c '{"data":{"serviceStopped":false}}'` |
+| HDI create failed | Delete & recreate: `cf delete-service po-project-db -f && cf create-service hana hdi-shared po-project-db` |
+| `cds deploy` connection refused | Allowlist IP: `cf update-service Dev-hana -c '{"data":{"whitelistIPs":["0.0.0.0/0"]}}'` |
+| `impl: '@cap-js/sqlite'` in hybrid | Pastikan `"impl": "@cap-js/hana"` ada di `[hybrid]` profile di package.json |
+| SAP: "Material number required" | Gunakan material real: `EWMS4-01`, `EWMS4-02` |
+| SAP: "CSRF token validation failed" | CSRF token expired — retry (token otomatis di-fetch ulang) |
+| Fiori UI blank | Cek browser console → pastikan `/odata/v4/po/` accessible |
 
 ---
 
-### Verifikasi Add Item (di Object Page)
-
-**Langkah:** Di Object Page, klik **[Edit]** → scroll ke section Items → **[Add Row]**
-
-**Value Help — Material (klik 🔍):**
-
-```
-┌──────────────────────────────────────────────────────────┐
-│  Select Material                               [Select] │
-│  ┌──────────┬────────────────────────────┬──────────────┐│
-│  │ Mat. No  │ Description                │ Unit Price   ││
-│  ├──────────┼────────────────────────────┼──────────────┤│
-│  │ MAT-10001│ Bearing SKF 6205           │ 125,000      ││
-│  │ MAT-10002│ Hydraulic Oil ISO 46 (20L) │ 450,000      ││
-│  │ MAT-10003│ V-Belt Type B68            │ 85,000       ││
-│  │ MAT-10004│ Safety Helmet (Yellow)     │ 75,000       ││
-│  │ MAT-10005│ Welding Rod E6013 (5Kg)    │ 95,000       ││
-│  │ MAT-10006│ Pipa Besi 2" Sch 40 (6M)  │ 320,000      ││
-│  │ MAT-10007│ Kabel NYY 4x10mm² (per M) │ 185,000      ││
-│  │ MAT-10008│ Glove Latex Industrial     │ 45,000       ││
-│  └──────────┴────────────────────────────┴──────────────┘│
-└──────────────────────────────────────────────────────────┘
-```
-
-**✅ Setelah pilih material & isi quantity, lalu Save:**
-- Description, UoM, Unit Price → auto-fill dari material master
-- Net Amount → auto-calculated (qty × unit price)
-- Total Amount di header → auto-updated
-
----
-
-## OData Testing — REST Client File
-
-### File: `tests/po-tests.http`
-
-```http
-@host = http://localhost:4004/odata/v4/po
-
-### ========================================
-### READ: Semua PO dengan expand
-### ========================================
-GET {{host}}/PurchaseOrders?$expand=supplier,items($expand=material)&$orderby=poNumber
-Accept: application/json
-
-### ========================================
-### READ: PO filter status Open
-### ========================================
-GET {{host}}/PurchaseOrders?$filter=status eq 'O'&$select=poNumber,description,status,totalAmount
-Accept: application/json
-
-### ========================================
-### READ: Materials master data
-### ========================================
-GET {{host}}/Materials?$orderby=materialNo
-Accept: application/json
-
-### ========================================
-### READ: Active Suppliers only
-### ========================================
-GET {{host}}/Suppliers?$filter=isActive eq true&$select=supplierNo,name,city
-Accept: application/json
-
-### ========================================
-### CREATE: Buat PO baru
-### ========================================
-POST {{host}}/PurchaseOrders
-Content-Type: application/json
-
-{
-    "description": "Pengadaan Tools Maintenance Q2",
-    "supplier_ID": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-    "orderDate": "2024-04-01",
-    "deliveryDate": "2024-05-01",
-    "currency_code": "IDR",
-    "notes": "Untuk kebutuhan maintenance shutdown"
-}
-
-### ========================================
-### CREATE: Tambah item ke PO (ganti <PO_ID>)
-### ========================================
-POST {{host}}/PurchaseOrderItems
-Content-Type: application/json
-
-{
-    "parent_ID": "<PO_ID>",
-    "material_ID": "a1b2c3d4-e5f6-7890-abcd-ef1234567001",
-    "quantity": 10
-}
-
-### ========================================
-### ACTION: Post PO (ganti <PO_ID>)
-### ========================================
-POST {{host}}/postPO
-Content-Type: application/json
-
-{
-    "poID": "<PO_ID>"
-}
-
-### ========================================
-### ACTION: Approve PO
-### ========================================
-POST {{host}}/approvePO
-Content-Type: application/json
-
-{
-    "poID": "<PO_ID>"
-}
-
-### ========================================
-### ACTION: Reject PO
-### ========================================
-POST {{host}}/rejectPO
-Content-Type: application/json
-
-{
-    "poID": "<PO_ID>",
-    "reason": "Budget belum disetujui Finance"
-}
-
-### ========================================
-### ACTION: Cancel PO (status Draft/Open)
-### ========================================
-POST {{host}}/cancelPO
-Content-Type: application/json
-
-{
-    "poID": "b1c2d3e4-f5a6-7890-bcde-f12345670004"
-}
-
-### ========================================
-### FUNCTION: Supplier PO Summary
-### ========================================
-GET {{host}}/getSupplierPOSummary(supplierID=f47ac10b-58cc-4372-a567-0e02b2c3d479)
-Accept: application/json
-
-### ========================================
-### READ: Status History (Audit Trail)
-### ========================================
-GET {{host}}/POStatusHistory?$orderby=changedAt desc&$top=5
-Accept: application/json
-```
-
----
-
-## End-to-End Flow — Complete Test Scenario
-
-Berikut alur test lengkap yang dijalankan secara berurutan:
-
-```
-Step 1: CREATE PO
-  POST /po/PurchaseOrders { description, supplier_ID, dates }
-  → Response: PO-260005, status: "O", total: 0
-  → Simpan <PO_ID> dari response
-
-Step 2: ADD ITEMS (2 items)
-  POST /po/PurchaseOrderItems { parent_ID: <PO_ID>, material_ID: MAT-10001, qty: 10 }
-  → Response: itemNo: 10, netAmount: 1,250,000, auto-fill dari material
-  
-  POST /po/PurchaseOrderItems { parent_ID: <PO_ID>, material_ID: MAT-10004, qty: 20 }
-  → Response: itemNo: 20, netAmount: 1,500,000, auto-fill dari material
-
-Step 3: VERIFY PO TOTAL
-  GET /po/PurchaseOrders(<PO_ID>)?$select=totalAmount
-  → Response: totalAmount: 2,750,000 (auto-recalculated)
-
-Step 4: POST PO
-  POST /po/postPO { poID: <PO_ID> }
-  → Response: "PO PO-260005 berhasil di-posting (2 items, total: 2750000)"
-  → Status: O → P
-
-Step 5: VERIFY IMMUTABILITY
-  PATCH /po/PurchaseOrders(<PO_ID>) { description: "ubah" }
-  → Response: 400 "PO PO-260005 berstatus P — tidak dapat diubah"
-
-Step 6: APPROVE PO
-  POST /po/approvePO { poID: <PO_ID> }
-  → Response: "PO PO-260005 disetujui"
-  → Status: P → A
-
-Step 7: CHECK AUDIT TRAIL
-  GET /po/POStatusHistory?$filter=purchaseOrder_ID eq <PO_ID>
-  → Response: 2 records (O→P, P→A)
-
-Step 8: CHECK FIORI LIST
-  → PO-260005 muncul dengan status hijau (Approved)
-  → Total: 2,750,000 IDR
-```
-
-**✅ Semua steps berhasil — End-to-End flow verified.**
-
----
-
-## Annotation → UI Mapping Reference
-
-| CDS Annotation | Hasil di Fiori UI |
-|:---------------|:------------------|
-| `@UI.LineItem` | Kolom-kolom di tabel List Report |
-| `@UI.SelectionFields` | Filter bar di atas tabel |
-| `@UI.PresentationVariant.SortOrder` | Default sorting (poNumber desc) |
-| `@UI.HeaderInfo` | Judul & subtitle di Object Page header |
-| `@UI.HeaderFacets` | KPI tiles di header (Status, Total) |
-| `@UI.DataPoint` | Single value display di header |
-| `@UI.Facets` | Sections/tabs di Object Page body |
-| `@UI.FieldGroup` | Kumpulan field dalam section |
-| `Criticality: statusCriticality` | Warna status (hijau/merah/orange) |
-| `@Common.ValueList` | Dropdown value help (Supplier, Material) |
-| `@Measures.ISOCurrency` | Tampilkan currency sebelah angka |
-| `items/@UI.LineItem` | Tabel items embedded di Object Page |
-
----
-
-## Ringkasan Verifikasi
-
-| Komponen | Status | Detail |
-|:---------|:-------|:-------|
-| List Report | ✅ | 4 PO, filter bar, sorting, status berwarna |
-| Object Page | ✅ | Header KPI, 3 sections (General, Items, Notes) |
-| Create PO | ✅ | Form + value help Supplier + auto PO number |
-| Add Item | ✅ | Value help Material + auto-fill + auto-calc |
-| Post PO Action | ✅ | Status O→P, validasi items & total |
-| Cancel PO Action | ✅ | Status O→X |
-| Approve PO Action | ✅ | Status P→A |
-| Reject PO Action | ✅ | Status P→R, alasan wajib |
-| Immutability | ✅ | PO Posted/Approved tidak bisa di-edit |
-| Audit Trail | ✅ | POStatusHistory logging setiap status change |
-| REST Client file | ✅ | `tests/po-tests.http` lengkap untuk semua endpoint |
-
----
-
-## Kesimpulan
-
-- ✅ **Fiori Elements List Report** menampilkan data PO dengan filter, sort, dan status berwarna
-- ✅ **Object Page** menampilkan header KPI, general info, items table, dan notes
-- ✅ **Create Flow** berjalan end-to-end: form → value help → save → auto PO number
-- ✅ **Posting Flow** berjalan: create PO → add items → post → approve/reject
-- ✅ **Value Help** untuk Supplier dan Material menampilkan master data
-- ✅ **Auto-fill** dari material master (description, uom, price) berfungsi
-- ✅ **Auto-calculation** net amount dan total amount berfungsi
-- ✅ **Status management** dengan 4 actions + validasi + audit trail lengkap
-- ✅ **REST Client test file** tersedia untuk testing semua endpoint
-
----
-
-## 🔍 Bonus: Perbandingan OData — Workshop CAP vs S/4HANA Real
-
-> Sesi ini menunjukkan bahwa OData query yang kita jalankan di CAP **memiliki pola yang sama**
-> dengan query ke sistem S/4HANA real di `sap.ilmuprogram.com`.
-
-### Side-by-Side OData Query Comparison
-
-| Operasi | CAP (localhost:4004) | S/4HANA Real (sap.ilmuprogram.com) |
-|:--------|:--------------------|:----------------------------------|
-| **List PO** | `GET /odata/v4/po/PurchaseOrders` | `GET /sap/opu/odata/sap/C_PURCHASEORDER_FS_SRV/C_PurchaseOrderFs` |
-| **PO Detail** | `GET /odata/v4/po/PurchaseOrders('uuid')` | `GET .../C_PurchaseOrderFs('4500000015')` |
-| **PO Items** | `?$expand=items` | `.../C_PurchaseOrderFs('4500000015')/to_PurchaseOrderItem` |
-| **Supplier** | `?$expand=supplier` | `.../C_PurchaseOrderFs('4500000015')/to_InvoicingParty` |
-| **Filter** | `?$filter=status eq 'D'` | `?$filter=PurchasingDocumentStatus eq '03'` |
-| **Select** | `?$select=poNumber,totalAmount` | `?$select=PurchaseOrder,PurchaseOrderNetAmount` |
-| **Top/Skip** | `?$top=5&$skip=10` | `?$top=5&$skip=10` |
-| **Format** | Default JSON (OData V4) | `?$format=json` (OData V2) |
-| **Metadata** | `GET /odata/v4/po/$metadata` | `GET .../C_PURCHASEORDER_FS_SRV/$metadata` |
-
-### Response Comparison: CAP vs S/4HANA Real
-
-**CAP Response (workshop):**
-```json
-{
-  "poNumber": "PO-240001",
-  "description": "Pengadaan Spare Parts Q1",
-  "status": "P",
-  "totalAmount": 1295000,
-  "supplier": { "name": "PT Baja Nusantara" },
-  "items": [
-    { "itemNo": 10, "description": "Bearing SKF 6205", "quantity": 5, "netAmount": 625000 }
-  ]
-}
-```
-
-**S/4HANA Real Response:**
-```json
-{
-  "PurchaseOrder": "4500000015",
-  "PurchaseOrder_Text": "Standard PO",
-  "PurchasingDocumentStatus": "03",
-  "PurchaseOrderNetAmount": "3020.00",
-  "SupplierName": "Domestic US JV Partner 1",
-
-  "ZZ1_RefExtIDWahyu2_PDH": "",
-  "ZZ1_ref_external_h01_PDH": "",
-  "ZZ1_RefExtIDVidetra_PDH": "0.00"
-}
-```
-
-**Perbedaan kunci:**
-| Aspek | CAP (OData V4) | S/4HANA (OData V2) |
-|:------|:---------------|:-------------------|
-| Protocol | OData V4 | OData V2 |
-| Naming | camelCase (`poNumber`) | PascalCase (`PurchaseOrder`) |
-| Navigation | `$expand=items` | `/to_PurchaseOrderItem` |
-| Result wrapper | `{ "value": [...] }` | `{ "d": { "results": [...] } }` |
-| Key format | UUID | 10-digit string |
-| Auth | None (dev) / JWT | Basic Auth + SAP Client |
-| Custom fields | New entity/field | ZZ1_ prefix in-line |
-
-### Real OData Services Discovery
-
-Dari **2.178 services** yang aktif di sap.ilmuprogram.com, procurement-related services:
-
-```
-Procurement OData Services Tersedia:
-═══════════════════════════════════════════════════════════
-
-📋 Purchase Order
-├── C_PURCHASEORDER_FS_SRV         → PO Fiori List/Detail (BISA DIAKSES ✅)
-├── MM_PUR_PO_MAINT_V2_SRV        → PO Maintenance
-├── MM_PUR_POITEMS_MONI_SRV       → PO Items Monitor
-├── MM_PUR_PO_HISTORY_SRV         → PO Change History
-├── MM_PUR_POMASS_UPDATE_SRV      → PO Mass Update
-├── C_CNTRLPURCHASEORDER_FS_SRV   → Central PO
-└── SIMPLE_INB_PO_SRV             → Simple Inbound PO
-
-👤 Supplier Master
-├── MD_SUPPLIER_MASTER_SRV         → Full Supplier Master (BISA DIAKSES ✅)
-├── C_SUPPLIER_FS_SRV              → Supplier Analytics (BISA DIAKSES ✅)
-├── FAP_DISPLAY_SUPPLIER_LIST      → Supplier Display
-├── MM_SUPPLIER_INVOICE_MANAGE     → Supplier Invoice
-└── UI_SUPPLIERLIST_MANAGE         → Supplier List Management
-
-📦 Material / Inventory
-├── MMIM_MATERIAL_DATA_SRV         → Material Headers (BISA DIAKSES ✅)
-├── MMIM_MULTIPLE_MATERIAL_SRV     → Multi-Material View
-├── MM_IM_PHYS_INV_DOC_SRV        → Physical Inventory
-└── UI_STOCKREPORTING_O2           → Stock Reporting
-
-📄 Purchase Requisition
-├── MM_PUR_PR_PROCESS_SRV          → PR Processing
-├── MM_PUR_PRITEM_MNTR_SRV        → PR Item Monitor
-├── MM_PUR_REQ_HISTORY_SRV        → PR History
-└── MM_PUR_REQ_APPROVAL_COMPLETION_SRV → PR Approval
-
-⚠️  CATATAN: Standard API Hub services (API_PURCHASEORDER_PROCESS_SRV,
-    API_BUSINESS_PARTNER, API_PRODUCT_SRV) BELUM diaktifkan di sistem ini.
-    Yang aktif adalah Fiori OData services (C_, MM_PUR_, MD_ prefix).
-```
-
-> **Takeaway untuk peserta:** OData skills yang Anda pelajari di workshop (query, filter,
-> expand, select, metadata) **100% transferable** ke S/4HANA real. Yang berubah hanya
-> naming convention dan URL pattern — fundamental-nya sama.
+**Selesai! Workshop Day 3 — Clean Core Extensibility: End-to-End.**

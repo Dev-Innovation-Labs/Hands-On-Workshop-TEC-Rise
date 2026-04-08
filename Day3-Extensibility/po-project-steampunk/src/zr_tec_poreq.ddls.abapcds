@@ -1,0 +1,47 @@
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'TEC Rise - PO Request (Interface)'
+define root view entity ZR_TEC_POREQ
+  as select from ztec_poreq
+  composition [0..*] of ZR_TEC_POREQI as _Items
+{
+  key request_uuid      as RequestUUID,
+      request_no        as RequestNo,
+      description       as Description,
+      company_code      as CompanyCode,
+      purchasing_org    as PurchasingOrg,
+      purchasing_group  as PurchasingGroup,
+      supplier          as Supplier,
+      supplier_name     as SupplierName,
+      order_date        as OrderDate,
+      delivery_date     as DeliveryDate,
+      @Semantics.amount.currencyCode: 'Currency'
+      total_amount      as TotalAmount,
+      currency          as Currency,
+      notes             as Notes,
+      status            as Status,
+      sap_po_number     as SAPPONumber,
+      sap_post_message  as SAPPostMessage,
+
+      // Criticality for status (like statusCriticality in CAP)
+      case status
+        when 'D' then 0  // Draft = neutral
+        when 'P' then 3  // Posted = positive (green)
+        when 'E' then 1  // Error = negative (red)
+        else 0
+      end                 as StatusCriticality,
+
+      // Admin fields
+      @Semantics.user.createdBy: true
+      created_by        as CreatedBy,
+      @Semantics.systemDateTime.createdAt: true
+      created_at        as CreatedAt,
+      @Semantics.user.lastChangedBy: true
+      last_changed_by   as LastChangedBy,
+      @Semantics.systemDateTime.lastChangedAt: true
+      last_changed_at   as LastChangedAt,
+      @Semantics.systemDateTime.localInstanceLastChangedAt: true
+      local_last_changed as LocalLastChanged,
+
+      // Composition
+      _Items
+}

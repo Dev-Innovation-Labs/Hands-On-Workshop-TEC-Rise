@@ -1,0 +1,147 @@
+###############################################
+# PO Project In-Apps — REST Client Tests
+# Backend: CBO (ZZ1_WPOREQ + ZZ1_WPOREQI)
+# Endpoint: http://localhost:4004/po
+###############################################
+
+@baseUrl = http://localhost:4004
+
+### ========================================
+### 1. Service Document
+### ========================================
+GET {{baseUrl}}/po
+
+### ========================================
+### 2. OData V4 Metadata
+### ========================================
+GET {{baseUrl}}/odata/v4/po/$metadata
+
+### ========================================
+### 3. GET All PO Requests
+### ========================================
+GET {{baseUrl}}/po/PORequests
+
+### ========================================
+### 4. GET All PO Requests with Items ($expand)
+### ========================================
+GET {{baseUrl}}/po/PORequests?$expand=items
+
+### ========================================
+### 5. GET PO Requests — Filter by Status (Draft)
+### ========================================
+GET {{baseUrl}}/po/PORequests?$filter=status eq 'D'
+
+### ========================================
+### 6. GET PO Requests — Filter by Status (Posted/Error)
+### ========================================
+GET {{baseUrl}}/po/PORequests?$filter=status eq 'P' or status eq 'E'
+
+### ========================================
+### 7. CREATE — New PO Request WITH Items
+###    (Deep Create: header + 2 items in one call)
+### ========================================
+POST {{baseUrl}}/po/PORequests
+Content-Type: application/json
+
+{
+    "description": "Workshop CBO Test — Office Supplies",
+    "supplier": "17300001",
+    "supplierName": "Wahyu Amaldi",
+    "companyCode": "1710",
+    "purchasingOrg": "1710",
+    "purchasingGroup": "001",
+    "deliveryDate": "2026-04-30",
+    "currency": "USD",
+    "notes": "Test dari po-project-in-apps (CBO backend)",
+    "items": [
+        {
+            "materialNo": "TG11",
+            "description": "Green Tea Premium 500g",
+            "quantity": 100,
+            "uom": "PC",
+            "unitPrice": 35.00,
+            "plant": "1710",
+            "materialGroup": "L001"
+        },
+        {
+            "materialNo": "TG12",
+            "description": "Black Tea Premium 250g",
+            "quantity": 50,
+            "uom": "PC",
+            "unitPrice": 28.50,
+            "plant": "1710",
+            "materialGroup": "L001"
+        }
+    ]
+}
+
+### ========================================
+### 8. GET Single PO Request (by ID)
+###    ⬇️ Replace <ID> with actual UUID from step 7
+### ========================================
+GET {{baseUrl}}/po/PORequests(<ID>)?$expand=items
+
+### ========================================
+### 9. UPDATE — Edit PO Request notes
+###    ⬇️ Replace <ID> with actual UUID
+### ========================================
+PATCH {{baseUrl}}/po/PORequests(<ID>)
+Content-Type: application/json
+
+{
+    "notes": "Updated notes — ready for SAP posting"
+}
+
+### ========================================
+### 10. CREATE Item — Add item to existing PO
+###     ⬇️ Replace <ID> with actual PO UUID
+### ========================================
+POST {{baseUrl}}/po/PORequestItems
+Content-Type: application/json
+
+{
+    "parent_ID": "<ID>",
+    "materialNo": "TG13",
+    "description": "Oolong Tea Premium 300g",
+    "quantity": 25,
+    "uom": "PC",
+    "unitPrice": 45.00,
+    "plant": "1710",
+    "materialGroup": "L001"
+}
+
+### ========================================
+### 11. POST TO SAP — Create real PO in S/4HANA
+###     ⬇️ Replace <ID> with PO Request UUID
+###     ⬅️ Ini akan membuat PO asli: 4500000020+
+### ========================================
+POST {{baseUrl}}/po/PORequests(<ID>)/PurchaseOrderService.postToSAP
+Content-Type: application/json
+
+{}
+
+### ========================================
+### 12. Test CBO Connection
+### ========================================
+GET {{baseUrl}}/po/testCBOConnection()
+
+### ========================================
+### 13. Test SAP Connection
+### ========================================
+GET {{baseUrl}}/po/testSAPConnection()
+
+### ========================================
+### 14. Get SAP Suppliers
+### ========================================
+GET {{baseUrl}}/po/getSAPSuppliers()
+
+### ========================================
+### 15. GET All Items (direct)
+### ========================================
+GET {{baseUrl}}/po/PORequestItems
+
+### ========================================
+### 16. DELETE PO Request (cascade: items + header)
+###     ⬇️ Replace <ID> — must be Draft/Error status
+### ========================================
+DELETE {{baseUrl}}/po/PORequests(<ID>)

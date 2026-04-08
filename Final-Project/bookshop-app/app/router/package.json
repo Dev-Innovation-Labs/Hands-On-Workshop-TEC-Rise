@@ -1,0 +1,11 @@
+{
+  "name": "bookshop-router",
+  "version": "1.0.0",
+  "description": "Approuter for TEC Rise Bookshop",
+  "dependencies": {
+    "@sap/approuter": "^16"
+  },
+  "scripts": {
+    "start": "node node_modules/@sap/approuter/approuter.js"
+  }
+}

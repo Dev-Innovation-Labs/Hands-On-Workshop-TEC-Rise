@@ -29,16 +29,20 @@ cds.on('bootstrap', app => {
     });
 });
 
-const cds_server = require('@sap/cds/server');
+// Hanya jalankan standalone server jika dieksekusi langsung (node server.js)
+// Saat di-load oleh cds-serve sebagai hook, bagian ini tidak dijalankan
+if (require.main === module) {
+    const cds_server = require('@sap/cds/server');
 
-// Gunakan port dari env atau default 4004
-const port = process.env.PORT || 4004;
+    // Gunakan port dari env atau default 4004
+    const port = process.env.PORT || 4004;
 
-cds_server({ service: 'all', port })
-    .then(srv => {
-        const p = port;
-        console.log('[server] ✅ Server berjalan!');
-        console.log('[server] 📡 OData API : http://localhost:' + p + '/catalog/Books');
-        console.log('[server] 🎨 Fiori App : http://localhost:' + p + '/books/webapp/standalone.html');
-    })
-    .catch(err => { console.error('[server] FAILED:', err.message); process.exit(1); });
+    cds_server({ service: 'all', port })
+        .then(srv => {
+            const p = port;
+            console.log('[server] ✅ Server berjalan!');
+            console.log('[server] 📡 OData API : http://localhost:' + p + '/catalog/Books');
+            console.log('[server] 🎨 Fiori App : http://localhost:' + p + '/books/webapp/standalone.html');
+        })
+        .catch(err => { console.error('[server] FAILED:', err.message); process.exit(1); });
+}

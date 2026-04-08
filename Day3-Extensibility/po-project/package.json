@@ -1,0 +1,63 @@
+{
+  "name": "po-project",
+  "version": "1.0.0",
+  "description": "Day 3: Clean Core Side-by-Side Extension — PO Request Z-table → Post to SAP S/4HANA",
+  "dependencies": {
+    "@cap-js/hana": "^2",
+    "@sap/cds": "^9",
+    "dotenv": "^16"
+  },
+  "devDependencies": {
+    "@cap-js/sqlite": "^2"
+  },
+  "scripts": {
+    "start": "cds-serve",
+    "watch": "cds watch",
+    "watch:hybrid": "cds watch --profile hybrid",
+    "build": "cds build --production",
+    "deploy:hana": "cds deploy --to hana"
+  },
+  "cds": {
+    "fiori": {
+      "lean_draft": true
+    },
+    "requires": {
+      "db": {
+        "kind": "sql"
+      }
+    },
+    "[development]": {
+      "requires": {
+        "db": {
+          "kind": "sqlite",
+          "impl": "@cap-js/sqlite",
+          "credentials": {
+            "url": ":memory:"
+          }
+        }
+      }
+    },
+    "[hybrid]": {
+      "requires": {
+        "db": {
+          "kind": "hana",
+          "impl": "@cap-js/hana",
+          "deploy-format": "hdbtable"
+        }
+      }
+    },
+    "[production]": {
+      "requires": {
+        "db": {
+          "kind": "hana",
+          "impl": "@cap-js/hana",
+          "deploy-format": "hdbtable"
+        }
+      }
+    }
+  },
+  "sapux": [
+    "app/po"
+  ],
+  "private": true
+}

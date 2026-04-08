@@ -1,0 +1,110 @@
+### ============================================
+### Day 3: PO Request API Tests
+### REST Client for VS Code
+### ============================================
+
+@host = http://localhost:4004
+
+### ============================================
+### 1. Service Document
+### ============================================
+GET {{host}}/po
+
+### ============================================
+### 2. Service Metadata
+### ============================================  
+GET {{host}}/po/$metadata
+
+### ============================================
+### 3. GET All PO Requests
+### ============================================
+GET {{host}}/po/PORequests?$expand=items
+
+### ============================================
+### 4. GET PO Requests - Draft only
+### ============================================
+GET {{host}}/po/PORequests?$filter=status eq 'D'
+
+### ============================================
+### 5. GET PO Requests - Posted/Error
+### ============================================
+GET {{host}}/po/PORequests?$filter=status eq 'P' or status eq 'E'
+
+### ============================================
+### 6. CREATE New PO Request (Draft)
+### ============================================
+POST {{host}}/po/PORequests
+Content-Type: application/json
+
+{
+    "description": "Office Supplies for Q4",
+    "supplier": "17300001",
+    "supplierName": "Domestic US Supplier 1",
+    "companyCode": "1710",
+    "purchasingOrg": "1710",
+    "purchasingGroup": "001",
+    "orderDate": "2025-07-15",
+    "deliveryDate": "2025-08-15",
+    "currency": "USD",
+    "notes": "Urgent - needed before Q4 planning",
+    "items": [
+        {
+            "materialNo": "EWMS4-01",
+            "description": "Small Part for Office Equipment",
+            "quantity": 5,
+            "uom": "PC",
+            "unitPrice": 302.00,
+            "plant": "1710",
+            "materialGroup": "L001"
+        },
+        {
+            "materialNo": "EWMS4-02",
+            "description": "Safety Equipment Fast-Moving",
+            "quantity": 5,
+            "uom": "PC",
+            "unitPrice": 150.00,
+            "plant": "1710",
+            "materialGroup": "L001"
+        }
+    ]
+}
+
+### ============================================
+### 7. POST to SAP (Action) - Replace <ID> with actual UUID
+### ============================================
+# First get a Draft PO Request ID from step 3/6, then:
+# POST {{host}}/po/PORequests(<ID>)/PurchaseOrderService.postToSAP
+# Content-Type: application/json
+#
+# {}
+
+### ============================================
+### 8. GET SAP Suppliers (Function)
+### ============================================
+GET {{host}}/po/getSAPSuppliers()
+
+### ============================================
+### 9. Test SAP Connectivity
+### ============================================
+GET {{host}}/po/testSAPConnection()
+
+### ============================================
+### 10. GET Single PO Request with Items
+### ============================================
+# Replace <ID> with actual UUID:
+# GET {{host}}/po/PORequests(<ID>)?$expand=items
+
+### ============================================
+### 11. UPDATE PO Request Notes
+### ============================================
+# PATCH {{host}}/po/PORequests(<ID>)
+# Content-Type: application/json
+#
+# {
+#     "notes": "Updated: Price confirmed with supplier"
+# }
+
+### ============================================
+### 12. DELETE PO Request (Draft only)
+### ============================================
+# DELETE {{host}}/po/PORequests(<ID>)

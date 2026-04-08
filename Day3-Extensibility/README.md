@@ -1839,6 +1839,7 @@ Semua hasil hands-on didokumentasikan di folder **[handson/](./handson/)**:
 | [Hands-on 1: Extend CDS Model](./handson/handson-1-extend-cds-model.md) | PO Data Model lengkap (entities, types, CSV data) |
 | [Hands-on 2: Custom Handlers](./handson/handson-2-custom-handlers.md) | Business logic: validasi, auto-calculate, status management |
 | [Hands-on 3: OData Testing](./handson/handson-3-odata-testing.md) | OData queries, CRUD, actions, beserta response aktual |
+| [SIT — System Integration Testing](./po-project-sit/README.md) | Test cases end-to-end: SQLite, HANA, SAP integration, Fiori UI |
 
 ---
 

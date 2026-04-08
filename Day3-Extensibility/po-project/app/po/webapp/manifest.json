@@ -1,0 +1,88 @@
+{
+    "_version": "1.59.0",
+    "sap.app": {
+        "id": "com.tecrise.po",
+        "type": "application",
+        "title": "PO Request — Post to SAP",
+        "description": "Side-by-Side Extension: Z-table → SAP S/4HANA",
+        "applicationVersion": { "version": "1.0.0" },
+        "dataSources": {
+            "mainService": {
+                "uri": "/odata/v4/po/",
+                "type": "OData",
+                "settings": {
+                    "odataVersion": "4.0"
+                }
+            }
+        }
+    },
+    "sap.ui5": {
+        "dependencies": {
+            "minUI5Version": "1.120.0",
+            "libs": {
+                "sap.m": {},
+                "sap.ui.core": {},
+                "sap.ushell": {},
+                "sap.fe.templates": {}
+            }
+        },
+        "models": {
+            "": {
+                "dataSource": "mainService",
+                "preload": true,
+                "settings": {
+                    "synchronizationMode": "None",
+                    "operationMode": "Server",
+                    "autoExpandSelect": true,
+                    "earlyRequests": true
+                }
+            }
+        },
+        "routing": {
+            "routes": [
+                {
+                    "pattern": ":?query:",
+                    "name": "PORequestsList",
+                    "target": "PORequestsList"
+                },
+                {
+                    "pattern": "PORequests({key}):?query:",
+                    "name": "PORequestsObjectPage",
+                    "target": "PORequestsObjectPage"
+                }
+            ],
+            "targets": {
+                "PORequestsList": {
+                    "type": "Component",
+                    "id": "PORequestsList",
+                    "name": "sap.fe.templates.ListReport",
+                    "options": {
+                        "settings": {
+                            "contextPath": "/PORequests",
+                            "variantManagement": "Page",
+                            "initialLoad": "Enabled",
+                            "navigation": {
+                                "PORequests": {
+                                    "detail": {
+                                        "route": "PORequestsObjectPage"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "PORequestsObjectPage": {
+                    "type": "Component",
+                    "id": "PORequestsObjectPage",
+                    "name": "sap.fe.templates.ObjectPage",
+                    "options": {
+                        "settings": {
+                            "contextPath": "/PORequests",
+                            "editableHeaderContent": false
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

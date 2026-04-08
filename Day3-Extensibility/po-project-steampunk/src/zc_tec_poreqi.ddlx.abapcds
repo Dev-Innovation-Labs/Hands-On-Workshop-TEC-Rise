@@ -1,0 +1,47 @@
+@Metadata.layer: #CUSTOMER
+@UI.headerInfo: {
+  typeName: 'Item',
+  typeNamePlural: 'Items',
+  title: { type: #STANDARD, value: 'ItemNo' },
+  description: { type: #STANDARD, value: 'Description' }
+}
+annotate entity ZC_TEC_POREQI with
+{
+
+  @UI.lineItem: [{ position: 10 }]
+  ItemNo;
+
+  @UI.lineItem: [{ position: 20 }]
+  MaterialNo;
+
+  @UI.lineItem: [{ position: 30 }]
+  Description;
+
+  @UI.lineItem: [{ position: 40 }]
+  Quantity;
+
+  @UI.lineItem: [{ position: 45 }]
+  UoM;
+
+  @UI.lineItem: [{ position: 50 }]
+  UnitPrice;
+
+  @UI.lineItem: [{ position: 60 }]
+  NetAmount;
+
+  @UI.lineItem: [{ position: 65 }]
+  Currency;
+
+  @UI.lineItem: [{ position: 70 }]
+  Plant;
+
+  @UI.lineItem: [{ position: 80 }]
+  MaterialGroup;
+
+  @UI.hidden: true
+  ItemUUID;
+
+  @UI.hidden: true
+  RequestUUID;
+
+}

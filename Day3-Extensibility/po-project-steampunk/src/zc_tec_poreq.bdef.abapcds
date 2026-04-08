@@ -1,0 +1,28 @@
+projection;
+strict ( 2 );
+use draft;
+
+define behavior for ZC_TEC_POREQ alias PORequest
+{
+  use create;
+  use update;
+  use delete;
+
+  use action Edit;
+  use action Activate;
+  use action Discard;
+  use action Resume;
+  use action Prepare;
+
+  use action postToSAP;
+
+  use association _Items { create; with draft; }
+}
+
+define behavior for ZC_TEC_POREQI alias PORequestItem
+{
+  use update;
+  use delete;
+
+  use association _PORequest { with draft; }
+}

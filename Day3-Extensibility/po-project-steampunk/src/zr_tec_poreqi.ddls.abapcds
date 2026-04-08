@@ -1,0 +1,38 @@
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'TEC Rise - PO Request Item (Interface)'
+define view entity ZR_TEC_POREQI
+  as select from ztec_poreqi
+  association to parent ZR_TEC_POREQ as _PORequest
+    on $projection.RequestUUID = _PORequest.RequestUUID
+{
+  key item_uuid        as ItemUUID,
+      request_uuid     as RequestUUID,
+      request_no       as RequestNo,
+      item_no          as ItemNo,
+      material_no      as MaterialNo,
+      description      as Description,
+      @Semantics.quantity.unitOfMeasure: 'UoM'
+      quantity          as Quantity,
+      uom              as UoM,
+      @Semantics.amount.currencyCode: 'Currency'
+      unit_price       as UnitPrice,
+      @Semantics.amount.currencyCode: 'Currency'
+      net_amount       as NetAmount,
+      currency         as Currency,
+      plant            as Plant,
+      material_group   as MaterialGroup,
+
+      @Semantics.user.createdBy: true
+      created_by       as CreatedBy,
+      @Semantics.systemDateTime.createdAt: true
+      created_at       as CreatedAt,
+      @Semantics.user.lastChangedBy: true
+      last_changed_by  as LastChangedBy,
+      @Semantics.systemDateTime.lastChangedAt: true
+      last_changed_at  as LastChangedAt,
+      @Semantics.systemDateTime.localInstanceLastChangedAt: true
+      local_last_changed as LocalLastChanged,
+
+      // Association back to parent
+      _PORequest
+}

@@ -1,0 +1,31 @@
+@EndUserText.label : 'TEC Rise - PO Request Item'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table ztec_poreqi {
+
+  key client         : abap.clnt not null;
+  key item_uuid      : sysuuid_x16 not null;
+  request_uuid       : sysuuid_x16 not null;
+  request_no         : abap.char(20);
+  item_no            : abap.char(5);
+  material_no        : abap.char(40);
+  description        : abap.char(200);
+  @Semantics.quantity.unitOfMeasure : 'ztec_poreqi.uom'
+  quantity           : abap.quan(10,2);
+  uom                : abap.unit(3);
+  @Semantics.amount.currencyCode : 'ztec_poreqi.currency'
+  unit_price         : abap.curr(15,2);
+  @Semantics.amount.currencyCode : 'ztec_poreqi.currency'
+  net_amount         : abap.curr(15,2);
+  currency           : abap.cuky(5);
+  plant              : abap.char(4);
+  material_group     : abap.char(9);
+  created_by         : syuname;
+  created_at         : timestampl;
+  last_changed_by    : syuname;
+  last_changed_at    : timestampl;
+  local_last_changed : timestampl;
+
+}

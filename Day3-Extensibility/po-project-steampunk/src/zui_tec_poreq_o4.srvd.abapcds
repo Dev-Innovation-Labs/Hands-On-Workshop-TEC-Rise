@@ -1,0 +1,5 @@
+@EndUserText.label: 'TEC Rise - PO Request Service'
+define service ZUI_TEC_POREQ_O4 {
+  expose ZC_TEC_POREQ  as PORequest;
+  expose ZC_TEC_POREQI as PORequestItem;
+}
