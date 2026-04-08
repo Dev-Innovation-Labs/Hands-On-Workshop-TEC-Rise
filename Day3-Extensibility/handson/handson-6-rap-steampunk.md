@@ -1060,30 +1060,55 @@ Setelah paste → **Ctrl+S** (Save saja, JANGAN Activate dulu!)
 | `determination calcNetAmount` | Hitung Quantity × UnitPrice |
 | `determination calcHeaderTotal` | Hitung ulang total di header |
 
-### 5c. Urutan Aktivasi (Step-by-Step)
+### 5c. Buat Behavior Implementation Class
+
+> **"New Behavior Implementation" tidak muncul di menu?**  
+> Itu normal — opsi itu tidak selalu ada di context menu. Gunakan **Quick Fix** atau buat class manual.
+
+**Cara 1 — Quick Fix (Paling Mudah):**
+
+1. Di editor BDEF, letakkan cursor di nama class `ZBP_TEC_POREQ` (baris 2)
+2. Tekan **Ctrl+1** (Quick Fix)
+3. Pilih **"Create behavior implementation class ZBP_TEC_POREQ"**
+4. Finish → Class otomatis terbuat
+
+**Cara 2 — Manual (Jika Quick Fix tidak muncul):**
+
+1. Klik kanan package `$TMP` → **New → ABAP Class**
+2. Name: `ZBP_TEC_POREQ`
+3. Description: `TEC Rise - PO Request Behavior`
+4. **Add Interface**: `IF_ABAP_BEHAVIOR_SAVER` (untuk additional save)
+5. Finish → Class terbuat
+
+**Setelah class terbuat:**
+
+1. Buka class `ZBP_TEC_POREQ`
+2. Klik tab **"Local Types"** (di bawah editor)
+3. Paste kode dari **Langkah 6** di bawah
+4. **Ctrl+S** (Save)
+
+### 5d. Aktivasi Bersamaan
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  1. Paste kode BDEF di atas → Ctrl+S (Save)            │
-│     ⚠️ Akan muncul error "Class ZBP_TEC_POREQ does     │
-│        not exist" — ini NORMAL, lanjut ke step 2       │
+│  Di Project Explorer, select KEDUA object:              │
+│  (tahan Ctrl, klik satu-satu)                          │
 │                                                         │
-│  2. Klik kanan BDEF → New Behavior Implementation       │
-│     → Name: ZBP_TEC_POREQ → Finish                    │
-│                                                         │
-│  3. Di class, buka tab "Local Types"                    │
-│     → Paste kode dari Langkah 6 di bawah               │
-│     → Ctrl+S (Save)                                    │
-│                                                         │
-│  4. Di Project Explorer, select KEDUA object:           │
 │     ☑ ZR_TEC_POREQ (Behavior Definition)               │
 │     ☑ ZBP_TEC_POREQ (Class)                            │
-│     → Klik kanan → Activate (atau Ctrl+F3)             │
 │                                                         │
-│  5. ✅ Draft tables ZTEC_D_POREQ & ZTEC_D_POREQI       │
+│  → Klik kanan → Activate (atau Ctrl+F3)                │
+│                                                         │
+│  ✅ Draft tables ZTEC_D_POREQ & ZTEC_D_POREQI          │
 │     otomatis ter-generate                               │
 └─────────────────────────────────────────────────────────┘
 ```
+
+> **Troubleshooting Aktivasi:**
+> - Error `"Class ZBP_TEC_POREQ does not exist"` → class belum dibuat, ikuti 5c
+> - Error `"ZTEC_D_POREQ is not declared"` → ini draft table, otomatis dibuat saat BDEF aktif — abaikan dulu
+> - Error `"is not a lock entity"` → biasanya karena BDEF belum di-save, tekan Ctrl+S dulu
+> - Jika masih error → pastikan Table `ZTEC_POREQ` dan CDS View `ZR_TEC_POREQ` sudah aktif
 
 > **Lihat [Glosarium D](#d-behavior-definition-keywords)** untuk penjelasan lengkap setiap keyword di Behavior Definition. Dan **[Glosarium E](#e-behavior-implementation--eml-entity-manipulation-language)** untuk EML statements di Langkah 6.
 
