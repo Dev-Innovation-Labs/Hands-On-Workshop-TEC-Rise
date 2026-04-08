@@ -393,8 +393,8 @@ Description: `TEC Rise - PO Request Header`
 @AbapCatalog.dataMaintenance : #RESTRICTED
 define table ztec_poreq {
 
-  key client         : abap.clnt not null;       // ← Wajib! Multi-tenant SAP (client 777)
-  key request_uuid   : sysuuid_x16 not null;     // ← UUID 16-byte (setara cuid di CAP)
+  key client         : abap.clnt not null;       " Wajib! Multi-tenant SAP (client 777)
+  key request_uuid   : sysuuid_x16 not null;     " UUID 16-byte (setara cuid di CAP)
   request_no         : abap.char(20);
   description        : abap.char(200);
   company_code       : abap.char(4);
@@ -402,20 +402,20 @@ define table ztec_poreq {
   purchasing_group   : abap.char(3);
   supplier           : abap.char(10);
   supplier_name      : abap.char(80);
-  order_date         : abap.dats;                // ← Date format YYYYMMDD
+  order_date         : abap.dats;                " Date format YYYYMMDD
   delivery_date      : abap.dats;
-  currency           : abap.cuky(5);             // ← Currency key (USD, EUR)
+  currency           : abap.cuky(5);             " Currency key (USD, EUR)
   @Semantics.amount.currencyCode : 'ztec_poreq.currency'
-  total_amount       : abap.curr(15,2);          // ← Harus pair dengan cuky field ↑
+  total_amount       : abap.curr(15,2);          " Harus pair dengan cuky field ↑
   notes              : abap.char(256);
   status             : abap.char(1);
   sap_po_number      : abap.char(10);
   sap_post_message   : abap.char(200);
-  created_by         : syuname;                  // ← SAP username (setara managed.createdBy)
-  created_at         : timestampl;               // ← Timestamp long UTC
+  created_by         : syuname;                  " SAP username (setara managed.createdBy)
+  created_at         : timestampl;               " Timestamp long UTC
   last_changed_by    : syuname;
   last_changed_at    : timestampl;
-  local_last_changed : timestampl;               // ← Untuk ETag (optimistic locking)
+  local_last_changed : timestampl;               " Untuk ETag (optimistic locking)
 
 }
 ```
@@ -895,17 +895,17 @@ Klik kanan `ZR_TEC_POREQ` (Interface View) → **New Behavior Definition**
 Implementation Type: **Managed**
 
 ```abap
-managed with additional save                             // ← additional save: BAPI call di save phase
+managed with additional save                             " additional save: BAPI call di save phase
   implementation in class ZBP_TEC_POREQ unique;
-strict ( 2 );                                         // ← strict mode: enforce best practices
-with draft;                                           // ← enable Fiori draft/edit mode
+strict ( 2 );                                         " strict mode: enforce best practices
+with draft;                                           " enable Fiori draft/edit mode
 
-define behavior for ZR_TEC_POREQ alias PORequest      // ← alias: nama pendek utk ABAP code
-persistent table ztec_poreq                            // ← tabel untuk data aktif (bukan draft)
-draft table ztec_d_poreq                               // ← tabel draft (auto-generated)
-etag master LocalLastChanged                           // ← optimistic locking (concurrency)
-lock master total etag LastChangedAt                   // ← entity ini yg mengelola lock
-authorization master ( global )                        // ← auth check di level root entity
+define behavior for ZR_TEC_POREQ alias PORequest      " alias: nama pendek utk ABAP code
+persistent table ztec_poreq                            " tabel untuk data aktif (bukan draft)
+draft table ztec_d_poreq                               " tabel draft (auto-generated)
+etag master LocalLastChanged                           " optimistic locking (concurrency)
+lock master total etag LastChangedAt                   " entity ini yg mengelola lock
+authorization master ( global )                        " auth check di level root entity
 
 {
   // Standard CRUD — managed = framework auto handle INSERT/UPDATE/DELETE
@@ -914,14 +914,17 @@ authorization master ( global )                        // ← auth check di leve
   delete;
 
   // Draft support — 5 standard draft actions
-  draft action Edit;                    // ← copy data aktif → draft table
-  draft action Activate optimized;      // ← validasi + draft → tabel aktif
-  draft action Discard;                 // ← hapus draft, kembali ke data aktif
-  draft action Resume;                  // ← buka kembali draft yg ditinggalkan
-  draft determine action Prepare;       // ← pre-check sebelum Activate
+  draft action Edit;                    " copy data aktif → draft table
+  draft action Activate optimized;      " validasi + draft → tabel aktif
+  draft action Discard;                 " hapus draft, kembali ke data aktif
+  draft action Resume;                  " buka kembali draft yg ditinggalkan
+  draft determine action Prepare {      " pre-check sebelum Activate
+    validation validateSupplier;
+    validation validateDeliveryDate;
+  }
 
   // Custom action — tombol di Fiori UI
-  action postToSAP result [1] $self;    // ← return 1 instance dari entity ini
+  action postToSAP result [1] $self;    " return 1 instance dari entity ini
 
   // Determination — auto-logic saat create
   determination setRequestNo on modify { create; }
@@ -931,10 +934,11 @@ authorization master ( global )                        // ← auth check di leve
   validation validateDeliveryDate on save { create; update; field DeliveryDate; }
 
   // Field control
-  field ( readonly ) RequestUUID, RequestNo, TotalAmount, StatusCriticality,
+  field ( numbering : managed ) RequestUUID;            " auto-generate UUID
+  field ( readonly ) RequestNo, TotalAmount, StatusCriticality,
                      SAPPONumber, SAPPostMessage, CreatedBy, CreatedAt,
                      LastChangedBy, LastChangedAt, LocalLastChanged;
-  field ( readonly : update ) Status;   // ← bisa set saat create, readonly saat update
+  field ( readonly : update ) Status;   " bisa set saat create, readonly saat update
 
   // Mapping to DB fields
   mapping for ztec_poreq
@@ -967,11 +971,11 @@ authorization master ( global )                        // ← auth check di leve
 }
 
 define behavior for ZR_TEC_POREQI alias PORequestItem
-persistent table ztec_poreqi
-draft table ztec_d_poreqi
-etag master LocalLastChanged
-lock dependent by _PORequest              // ← lock dikelola oleh parent
-authorization dependent by _PORequest     // ← auth check ikut parent
+persistent table ztec_poreqi                           " tabel items
+draft table ztec_d_poreqi                              " tabel draft items (auto-generated)
+etag master LocalLastChanged                           " concurrency control
+lock dependent by _PORequest                           " lock dikelola oleh parent
+authorization dependent by _PORequest                  " auth check ikut parent
 
 {
   update;
@@ -979,9 +983,10 @@ authorization dependent by _PORequest     // ← auth check ikut parent
   // Tidak ada create — items hanya bisa dibuat via parent (composition)
 
   determination calcNetAmount on modify { create; update; field Quantity, UnitPrice; }
-  determination calcHeaderTotal on modify { create; update; delete; }  // ← jalan saat item ditambah/ubah/hapus
+  determination calcHeaderTotal on modify { create; update; delete; }  " jalan saat item ditambah/ubah/hapus
 
-  field ( readonly ) ItemUUID, RequestUUID, RequestNo,
+  field ( numbering : managed ) ItemUUID;              " auto-generate UUID
+  field ( readonly ) RequestUUID, RequestNo,
                      CreatedBy, CreatedAt, LastChangedBy, LastChangedAt, LocalLastChanged;
 
   mapping for ztec_poreqi
@@ -1011,6 +1016,21 @@ authorization dependent by _PORequest     // ← auth check ikut parent
 ```
 
 Activate → SAP akan otomatis generate **draft tables** `ZTEC_D_POREQ` dan `ZTEC_D_POREQI`.
+
+> **⚠️ Urutan Aktivasi BDEF:**
+> 1. **Save** BDEF dulu (Ctrl+S) — jangan langsung Activate
+> 2. Klik kanan BDEF → **New Behavior Implementation** → buat class `ZBP_TEC_POREQ`
+> 3. Di class, buka tab **Local Types** → paste kode dari Langkah 6 di bawah
+> 4. **Save** class (Ctrl+S)
+> 5. Kembali ke BDEF → **Activate** BDEF + Class bersamaan (select keduanya, Ctrl+F3)
+>
+> Error `"Class ZBP_TEC_POREQ does not exist"` normal — class belum dibuat. Ikuti urutan di atas.
+
+> **Perhatian Comment Syntax:**
+> - Di **BDEF** dan **Table Definition**: gunakan `"` untuk inline comment (setelah code)
+> - Di **CDS View** (DDLS/DDLX/SRVD): gunakan `//`
+> - Di **ABAP Class**: gunakan `"` saja
+> - `//` standalone line comment (baris dimulai `//`) valid di BDEF di dalam `{ }`
 
 > **Lihat [Glosarium D](#d-behavior-definition-keywords)** untuk penjelasan lengkap setiap keyword di Behavior Definition. Dan **[Glosarium E](#e-behavior-implementation--eml-entity-manipulation-language)** untuk EML statements di Langkah 6.
 
