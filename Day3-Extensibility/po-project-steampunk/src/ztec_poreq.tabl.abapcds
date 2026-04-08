@@ -5,8 +5,8 @@
 @AbapCatalog.dataMaintenance : #RESTRICTED
 define table ztec_poreq {
 
-  key client         : abap.clnt not null;       " ← Wajib! Multi-tenant SAP (client 777)
-  key request_uuid   : sysuuid_x16 not null;     " ← UUID 16-byte (setara cuid di CAP)
+  key client         : abap.clnt not null;       // ← Wajib! Multi-tenant SAP (client 777)
+  key request_uuid   : sysuuid_x16 not null;     // ← UUID 16-byte (setara cuid di CAP)
   request_no         : abap.char(20);
   description        : abap.char(200);
   company_code       : abap.char(4);
@@ -14,19 +14,19 @@ define table ztec_poreq {
   purchasing_group   : abap.char(3);
   supplier           : abap.char(10);
   supplier_name      : abap.char(80);
-  order_date         : abap.dats;                " ← Date format YYYYMMDD
+  order_date         : abap.dats;                // ← Date format YYYYMMDD
   delivery_date      : abap.dats;
-  currency           : abap.cuky(5);             " ← Currency key (USD, EUR)
+  currency           : abap.cuky(5);             // ← Currency key (USD, EUR)
   @Semantics.amount.currencyCode : 'ztec_poreq.currency'
-  total_amount       : abap.curr(15,2);          " ← Harus pair dengan cuky field ↑
+  total_amount       : abap.curr(15,2);          // ← Harus pair dengan cuky field ↑
   notes              : abap.char(256);
   status             : abap.char(1);
   sap_po_number      : abap.char(10);
   sap_post_message   : abap.char(200);
-  created_by         : syuname;                  " ← SAP username (setara managed.createdBy)
-  created_at         : timestampl;               " ← Timestamp long UTC
+  created_by         : syuname;                  // ← SAP username (setara managed.createdBy)
+  created_at         : timestampl;               // ← Timestamp long UTC
   last_changed_by    : syuname;
   last_changed_at    : timestampl;
-  local_last_changed : timestampl;               " ← Untuk ETag (optimistic locking)
+  local_last_changed : timestampl;               // ← Untuk ETag (optimistic locking)
 
 }

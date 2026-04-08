@@ -322,11 +322,11 @@ REDUCE decfloat34( INIT sum = 0 FOR item IN items NEXT sum = sum + item-NetAmoun
 ### H. Projection Behavior Keywords
 
 ```abap
-projection;                    " Karakter behavior: ini projection, bukan implementation
-use draft;                     " Forward draft handling dari R_ ke C_
-use create;                    " Forward CREATE operation
-use action postToSAP;          " Forward custom action
-use association _Items { create; with draft; }  " Forward composition
+projection;                    // Karakter behavior: ini projection, bukan implementation
+use draft;                     // Forward draft handling dari R_ ke C_
+use create;                    // Forward CREATE operation
+use action postToSAP;          // Forward custom action
+use association _Items { create; with draft; }  // Forward composition
 ```
 
 **Kenapa perlu Projection Behavior?**
@@ -393,8 +393,8 @@ Description: `TEC Rise - PO Request Header`
 @AbapCatalog.dataMaintenance : #RESTRICTED
 define table ztec_poreq {
 
-  key client         : abap.clnt not null;       " ← Wajib! Multi-tenant SAP (client 777)
-  key request_uuid   : sysuuid_x16 not null;     " ← UUID 16-byte (setara cuid di CAP)
+  key client         : abap.clnt not null;       // ← Wajib! Multi-tenant SAP (client 777)
+  key request_uuid   : sysuuid_x16 not null;     // ← UUID 16-byte (setara cuid di CAP)
   request_no         : abap.char(20);
   description        : abap.char(200);
   company_code       : abap.char(4);
@@ -402,20 +402,20 @@ define table ztec_poreq {
   purchasing_group   : abap.char(3);
   supplier           : abap.char(10);
   supplier_name      : abap.char(80);
-  order_date         : abap.dats;                " ← Date format YYYYMMDD
+  order_date         : abap.dats;                // ← Date format YYYYMMDD
   delivery_date      : abap.dats;
-  currency           : abap.cuky(5);             " ← Currency key (USD, EUR)
+  currency           : abap.cuky(5);             // ← Currency key (USD, EUR)
   @Semantics.amount.currencyCode : 'ztec_poreq.currency'
-  total_amount       : abap.curr(15,2);          " ← Harus pair dengan cuky field ↑
+  total_amount       : abap.curr(15,2);          // ← Harus pair dengan cuky field ↑
   notes              : abap.char(256);
   status             : abap.char(1);
   sap_po_number      : abap.char(10);
   sap_post_message   : abap.char(200);
-  created_by         : syuname;                  " ← SAP username (setara managed.createdBy)
-  created_at         : timestampl;               " ← Timestamp long UTC
+  created_by         : syuname;                  // ← SAP username (setara managed.createdBy)
+  created_at         : timestampl;               // ← Timestamp long UTC
   last_changed_by    : syuname;
   last_changed_at    : timestampl;
-  local_last_changed : timestampl;               " ← Untuk ETag (optimistic locking)
+  local_last_changed : timestampl;               // ← Untuk ETag (optimistic locking)
 
 }
 ```
@@ -895,17 +895,17 @@ Klik kanan `ZR_TEC_POREQ` (Interface View) → **New Behavior Definition**
 Implementation Type: **Managed**
 
 ```abap
-managed with additional save                             " ← additional save: BAPI call di save phase
+managed with additional save                             // ← additional save: BAPI call di save phase
   implementation in class ZBP_TEC_POREQ unique;
-strict ( 2 );                                         " ← strict mode: enforce best practices
-with draft;                                           " ← enable Fiori draft/edit mode
+strict ( 2 );                                         // ← strict mode: enforce best practices
+with draft;                                           // ← enable Fiori draft/edit mode
 
-define behavior for ZR_TEC_POREQ alias PORequest      " ← alias: nama pendek utk ABAP code
-persistent table ztec_poreq                            " ← tabel untuk data aktif (bukan draft)
-draft table ztec_d_poreq                               " ← tabel draft (auto-generated)
-etag master LocalLastChanged                           " ← optimistic locking (concurrency)
-lock master total etag LastChangedAt                   " ← entity ini yg mengelola lock
-authorization master ( global )                        " ← auth check di level root entity
+define behavior for ZR_TEC_POREQ alias PORequest      // ← alias: nama pendek utk ABAP code
+persistent table ztec_poreq                            // ← tabel untuk data aktif (bukan draft)
+draft table ztec_d_poreq                               // ← tabel draft (auto-generated)
+etag master LocalLastChanged                           // ← optimistic locking (concurrency)
+lock master total etag LastChangedAt                   // ← entity ini yg mengelola lock
+authorization master ( global )                        // ← auth check di level root entity
 
 {
   // Standard CRUD — managed = framework auto handle INSERT/UPDATE/DELETE
@@ -914,14 +914,14 @@ authorization master ( global )                        " ← auth check di level
   delete;
 
   // Draft support — 5 standard draft actions
-  draft action Edit;                    " ← copy data aktif → draft table
-  draft action Activate optimized;      " ← validasi + draft → tabel aktif
-  draft action Discard;                 " ← hapus draft, kembali ke data aktif
-  draft action Resume;                  " ← buka kembali draft yg ditinggalkan
-  draft determine action Prepare;       " ← pre-check sebelum Activate
+  draft action Edit;                    // ← copy data aktif → draft table
+  draft action Activate optimized;      // ← validasi + draft → tabel aktif
+  draft action Discard;                 // ← hapus draft, kembali ke data aktif
+  draft action Resume;                  // ← buka kembali draft yg ditinggalkan
+  draft determine action Prepare;       // ← pre-check sebelum Activate
 
   // Custom action — tombol di Fiori UI
-  action postToSAP result [1] $self;    " ← return 1 instance dari entity ini
+  action postToSAP result [1] $self;    // ← return 1 instance dari entity ini
 
   // Determination — auto-logic saat create
   determination setRequestNo on modify { create; }
@@ -934,7 +934,7 @@ authorization master ( global )                        " ← auth check di level
   field ( readonly ) RequestUUID, RequestNo, TotalAmount, StatusCriticality,
                      SAPPONumber, SAPPostMessage, CreatedBy, CreatedAt,
                      LastChangedBy, LastChangedAt, LocalLastChanged;
-  field ( readonly : update ) Status;   " ← bisa set saat create, readonly saat update
+  field ( readonly : update ) Status;   // ← bisa set saat create, readonly saat update
 
   // Mapping to DB fields
   mapping for ztec_poreq
@@ -970,16 +970,16 @@ define behavior for ZR_TEC_POREQI alias PORequestItem
 persistent table ztec_poreqi
 draft table ztec_d_poreqi
 etag master LocalLastChanged
-lock dependent by _PORequest              " ← lock dikelola oleh parent
-authorization dependent by _PORequest     " ← auth check ikut parent
+lock dependent by _PORequest              // ← lock dikelola oleh parent
+authorization dependent by _PORequest     // ← auth check ikut parent
 
 {
   update;
   delete;
-  " Tidak ada create — items hanya bisa dibuat via parent (composition)
+  // Tidak ada create — items hanya bisa dibuat via parent (composition)
 
   determination calcNetAmount on modify { create; update; field Quantity, UnitPrice; }
-  determination calcHeaderTotal on modify { create; update; delete; }  " ← jalan saat item ditambah/ubah/hapus
+  determination calcHeaderTotal on modify { create; update; delete; }  // ← jalan saat item ditambah/ubah/hapus
 
   field ( readonly ) ItemUUID, RequestUUID, RequestNo,
                      CreatedBy, CreatedAt, LastChangedBy, LastChangedAt, LocalLastChanged;
