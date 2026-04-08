@@ -1,5 +1,9 @@
 CLASS lhc_PORequest DEFINITION INHERITING FROM cl_abap_behavior_handler.
 
+  PUBLIC SECTION.
+    " Buffer untuk saver class — UUID request yang perlu di-post ke SAP
+    CLASS-DATA gt_post_keys TYPE TABLE OF sysuuid_x16.
+
   PRIVATE SECTION.
     METHODS:
       get_global_authorizations FOR GLOBAL AUTHORIZATION
@@ -139,20 +143,18 @@ CLASS lhc_PORequest IMPLEMENTATION.
         CONTINUE.
       ENDIF.
 
-      " TODO: Call MM_PUR_PO_MAINT_V2_SRV or BAPI_PO_CREATE1
-      " For workshop, simulate success:
-      DATA(lv_po_number) = |45000{ sy-datum+4(4) }|.
-      DATA(lv_message) = |PO { lv_po_number } berhasil dibuat via RAP (Embedded Steampunk)|.
+      " BAPI call dilakukan di saver class (additional save) → lihat lsc_ZR_TEC_POREQ
+      " Action ini hanya buffer key + set status pending
+      APPEND <req>-%tky-RequestUUID TO gt_post_keys.
 
-      " Update status
+      " Set status 'X' (pending post) — final status di-update oleh saver
       MODIFY ENTITIES OF ZR_TEC_POREQ IN LOCAL MODE
         ENTITY PORequest
-          UPDATE FIELDS ( Status SAPPONumber SAPPostMessage )
+          UPDATE FIELDS ( Status SAPPostMessage )
           WITH VALUE #( (
             %tky           = <req>-%tky
-            Status         = 'P'
-            SAPPONumber    = lv_po_number
-            SAPPostMessage = lv_message
+            Status         = 'X'
+            SAPPostMessage = 'Posting ke SAP...'
           ) ).
 
       " Read back for result
@@ -235,6 +237,132 @@ CLASS lhc_PORequestItem IMPLEMENTATION.
             TotalAmount = lv_total
           ) ).
     ENDLOOP.
+  ENDMETHOD.
+
+ENDCLASS.
+
+
+CLASS lsc_ZR_TEC_POREQ DEFINITION INHERITING FROM cl_abap_behavior_saver.
+
+  PROTECTED SECTION.
+    METHODS save_modified REDEFINITION.
+
+ENDCLASS.
+
+CLASS lsc_ZR_TEC_POREQ IMPLEMENTATION.
+
+  METHOD save_modified.
+    " Additional Save: Process pending postToSAP requests
+    " Dipanggil SETELAH managed framework save data ke DB.
+    " Di sini boleh CALL FUNCTION + BAPI_TRANSACTION_COMMIT.
+    LOOP AT lhc_PORequest=>gt_post_keys INTO DATA(lv_uuid).
+
+      " Read request header dari DB (sudah di-save oleh managed framework)
+      SELECT SINGLE * FROM ztec_poreq
+        WHERE request_uuid = @lv_uuid
+        INTO @DATA(ls_req).
+      IF sy-subrc <> 0. CONTINUE. ENDIF.
+
+      " Read items
+      SELECT * FROM ztec_poreqi
+        WHERE request_uuid = @lv_uuid
+        INTO TABLE @DATA(lt_items).
+
+      " Build BAPI Header
+      DATA(ls_header) = VALUE bapimepoheader(
+        comp_code  = ls_req-company_code
+        doc_type   = 'NB'
+        vendor     = ls_req-supplier
+        purch_org  = ls_req-purchasing_org
+        pur_group  = ls_req-purchasing_group
+        currency   = ls_req-currency
+        doc_date   = ls_req-order_date
+      ).
+      DATA(ls_headerx) = VALUE bapimepoheaderx(
+        comp_code  = abap_true
+        doc_type   = abap_true
+        vendor     = abap_true
+        purch_org  = abap_true
+        pur_group  = abap_true
+        currency   = abap_true
+        doc_date   = abap_true
+      ).
+
+      " Build BAPI Items
+      DATA lt_po_items TYPE TABLE OF bapimepoitem.
+      DATA lt_po_itemsx TYPE TABLE OF bapimepoitemx.
+      DATA lv_item_no TYPE n LENGTH 5 VALUE '00000'.
+
+      LOOP AT lt_items ASSIGNING FIELD-SYMBOL(<item>).
+        lv_item_no += 10.
+        APPEND VALUE bapimepoitem(
+          po_item    = lv_item_no
+          material   = <item>-material_no
+          short_text = <item>-description
+          quantity   = <item>-quantity
+          po_unit    = <item>-uom
+          net_price  = <item>-unit_price
+          plant      = <item>-plant
+          matl_group = <item>-material_group
+        ) TO lt_po_items.
+        APPEND VALUE bapimepoitemx(
+          po_item    = lv_item_no
+          po_itemx   = abap_true
+          material   = abap_true
+          short_text = abap_true
+          quantity   = abap_true
+          po_unit    = abap_true
+          net_price  = abap_true
+          plant      = abap_true
+          matl_group = abap_true
+        ) TO lt_po_itemsx.
+      ENDLOOP.
+
+      " Call BAPI_PO_CREATE1
+      DATA lv_po_number TYPE bapimepoheader-po_number.
+      DATA lt_return TYPE TABLE OF bapiret2.
+
+      CALL FUNCTION 'BAPI_PO_CREATE1'
+        EXPORTING
+          poheader         = ls_header
+          poheaderx        = ls_headerx
+        IMPORTING
+          exppurchaseorder = lv_po_number
+        TABLES
+          poitem           = lt_po_items
+          poitemx          = lt_po_itemsx
+          return           = lt_return.
+
+      " Check Result
+      DATA lv_has_error TYPE abap_bool VALUE abap_false.
+      DATA lv_messages TYPE string.
+      LOOP AT lt_return ASSIGNING FIELD-SYMBOL(<ret>) WHERE type = 'E' OR type = 'A'.
+        lv_has_error = abap_true.
+        lv_messages = |{ lv_messages } { <ret>-message }|.
+      ENDLOOP.
+
+      IF lv_has_error = abap_true.
+        " BAPI gagal → status Error
+        UPDATE ztec_poreq SET
+          status           = 'E',
+          sap_post_message = @lv_messages
+          WHERE request_uuid = @lv_uuid.
+      ELSE.
+        " BAPI sukses → commit + status Posted
+        CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+          EXPORTING wait = abap_true.
+
+        UPDATE ztec_poreq SET
+          status           = 'P',
+          sap_po_number    = @lv_po_number,
+          sap_post_message = @( |PO { lv_po_number } berhasil dibuat via BAPI (Embedded Steampunk)| )
+          WHERE request_uuid = @lv_uuid.
+      ENDIF.
+
+    ENDLOOP.
+
+    " Clear buffer
+    CLEAR lhc_PORequest=>gt_post_keys.
   ENDMETHOD.
 
 ENDCLASS.

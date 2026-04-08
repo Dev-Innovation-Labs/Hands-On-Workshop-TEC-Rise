@@ -1,4 +1,5 @@
-managed implementation in class ZBP_TEC_POREQ unique; " ← managed = framework handle CRUD
+managed with additional save                             " ← additional save: BAPI call di save phase
+  implementation in class ZBP_TEC_POREQ unique;
 strict ( 2 );                                         " ← strict mode: enforce best practices
 with draft;                                           " ← enable Fiori draft/edit mode
 
