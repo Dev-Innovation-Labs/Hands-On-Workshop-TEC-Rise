@@ -1,0 +1,73 @@
+No	Bagian	Pertanyaan	Prioritas	Jawaban
+1	Landscape BW	Versi SAP BW saat ini? (contoh: BW 7.5, BW 7.4)	H	
+2	Landscape BW	Database backend BW saat ini? (Oracle / MS SQL / DB2 / SAP ASE / SAP HANA / Lainnya)	H	
+3	Landscape BW	Ukuran total database BW? (TB/GB)	H	
+4	Landscape BW	Jumlah InfoProvider aktif? (InfoCube / DSO / MultiProvider / CompositeProvider / Lainnya)	H	
+5	Landscape BW	Jumlah InfoObject (characteristic + key figure)?	M	
+6	Landscape BW	Jumlah Process Chain aktif?	H	
+7	Landscape BW	Rata-rata runtime Process Chain terlama?	M	
+8	Landscape BW	Jumlah BEx Query / Query View aktif?	H	
+9	Landscape BW	Jumlah user BW aktif per bulan?	M	
+10	Landscape BW	Apakah sudah menggunakan HANA-optimized objects? (ADSO, CompositeProvider, Open ODS View) — Ya sebagian besar / Ya sebagian kecil / Belum	H	
+11	Landscape BW	Apakah ada BW Add-On atau custom ABAP di BW? Sebutkan	M	
+12	Landscape BW	BW di-host on-premise atau cloud?	H	
+13	Source System ECC	Versi SAP ECC? (contoh: ECC 6.0 EHP8)	H	
+14	Source System ECC	Jumlah source system terhubung ke BW? (SAP ECC / S/4HANA / Non-SAP / BPC / Lainnya)	H	
+15	Source System ECC	Apakah ECC sudah migrate ke S/4HANA? (Masih ECC / Sudah S/4 / Dalam proses / Paralel)	H	
+16	Source System ECC	Rencana migrasi ECC → S/4HANA? Target kapan?	H	
+17	Source System ECC	Modul SAP ECC aktif? (FI / CO / MM / SD / PP / PM / QM / HR / PS / Lainnya)	H	
+18	Data Source & Extractor	Total jumlah DataSource (extractor) aktif?	H	
+19	Data Source & Extractor	Breakdown DataSource per tipe? (Standard SAP / Generic custom / Custom ABAP SAPI)	H	
+20	Data Source & Extractor	Apakah ada custom extractor (RSO2 / CMOD exit)? Jumlah?	H	
+21	Data Source & Extractor	Apakah ada DataSource dengan delta mechanism (delta queue)? Jumlah?	H	
+22	Data Source & Extractor	Tipe delta yang digunakan? (ABR / AIM / ADD / AIMD / Tidak tahu)	M	
+23	Data Source & Extractor	Apakah sudah menggunakan ODP di ECC/S/4HANA? (Sepenuhnya ODP / Hybrid classic+ODP / Belum masih classic)	H	
+24	Data Source & Extractor	ODP Provider yang sudah digunakan? (ODP_SAPI / ODP_BW / ODP_CDS / ODP_SLT / Belum ada)	H	
+25	Data Source & Extractor	Apakah ada DataSource yang sudah discontinue di S/4HANA? Sebutkan	H	
+26	Data Source & Extractor	Apakah ada 3rd-party data yang di-load ke BW? (file / API / database)	M	
+27	Data Source & Extractor	Daftar DataSource aktif (export RSA5/RSA6) tersedia? (Terlampir / Menyusul / Belum)	H	
+28	ODP Readiness	Apakah ECC/S/4HANA sudah di-patch ODP Framework? (SAP Note 2232584) — Ya / Tidak / Tidak tahu	H	
+29	ODP Readiness	Apakah transaksi ODQMON sudah tersedia di source system?	H	
+30	ODP Readiness	Apakah RFC connection BW-ECC sudah tipe ODP? (Ya / Masih classic RFC type 3 / Tidak tahu)	M	
+31	ODP Readiness	Apakah ada DataSource yang tidak bisa di-migrate ke ODP? Sebutkan	H	
+32	ODP Readiness	Apakah ada requirement CDS View extraction dari S/4HANA? (Ya sudah identified / Ya belum / Tidak)	M	
+33	ODP Readiness	Apakah pernah menjalankan SAP Readiness Check / BW Migration Cockpit? (Ya lampirkan / Belum)	H	
+34	ODP Readiness	Apakah ada SLT untuk replication? (Ya — source tables? / Tidak)	M	
+35	ODP Readiness	Volume data yang di-load/delta per hari ke BW? (records/GB)	M	
+36	Arsitektur Target	Apakah landscape S/4HANA Rise sudah tersedia? (Ya / Dalam proses / Belum)	H	
+37	Arsitektur Target	Edisi S/4HANA Rise? (Private Cloud Edition / Public Cloud Edition / Belum ditentukan)	H	
+38	Arsitektur Target	BW/4HANA akan di-deploy sebagai? (Embedded di S/4 / Standalone BW/4HANA / SAP Datasphere / Hybrid / Belum ditentukan)	H	
+39	Arsitektur Target	Hyperscaler untuk Rise? (AWS / Azure / GCP / Belum ditentukan)	M	
+40	Arsitektur Target	Region/Datacenter yang dipilih?	M	
+41	Arsitektur Target	Kebutuhan SAP Analytics Cloud (SAC) sebagai frontend? (Pengganti BEx / Tambahan / Tidak / Evaluasi)	M	
+42	Arsitektur Target	Kebutuhan real-time replication (SLT/CDC)? (Ya — use case? / Tidak batch cukup)	M	
+43	Arsitektur Target	System lain yang perlu diintegrasi? (SAC / Datasphere / SuccessFactors / Ariba / Concur / Lainnya)	M	
+44	Reporting & Analytics	Frontend reporting saat ini? (BEx Analyzer / BEx Web / Analysis for Office / BusinessObjects / Lumira / SAC / Crystal / 3rd-party)	H	
+45	Reporting & Analytics	Jumlah report/dashboard aktif?	H	
+46	Reporting & Analytics	Apakah ada report regulatory/compliance (wajib)? Sebutkan	H	
+47	Reporting & Analytics	Top 10 report paling sering digunakan?	M	
+48	Reporting & Analytics	Kebutuhan migrasi BEx Query → SAC Story? (Semua / Sebagian / Tetap BEx / Belum ditentukan)	M	
+49	Reporting & Analytics	Apakah ada planning/input-ready query (BPC/IP)? Jumlah?	H	
+50	Reporting & Analytics	Kebutuhan Embedded Analytics langsung dari S/4HANA (tanpa BW)?	M	
+51	Security & Governance	Apakah menggunakan Analysis Authorization? (Ya — jumlah? / Tidak)	H	
+52	Security & Governance	Requirement row-level security? (per company code / per plant / lainnya)	H	
+53	Security & Governance	Requirement data masking/anonymization? (GDPR / PDP)	M	
+54	Security & Governance	Data retention policy? (Transactional: _ tahun / Master data: _ tahun / Aggregat: _ tahun)	M	
+55	Security & Governance	Requirement data archiving (ILM / NLS)?	M	
+56	Security & Governance	Audit/compliance requirement untuk akses data BW?	M	
+57	Security & Governance	Apakah menggunakan SSO untuk akses BW?	L	
+58	Tim & Timeline	Jumlah tim internal? (Basis: _ / BW Developer: _ / Functional: _ / PM: _)	H	
+59	Tim & Timeline	Kebutuhan external consultant? (Sudah ada partner / Belum ada / Internal saja)	M	
+60	Tim & Timeline	Target timeline? (Kick-off: _ / Development: _ / UAT: _ / Go-live: _)	H	
+61	Tim & Timeline	Project lain yang berjalan paralel dan bisa impact? (ECC→S/4 migration / SF rollout / dll)	H	
+62	Tim & Timeline	Downtime constraint? (max downtime / month-end freeze / dll)	M	
+63	Tim & Timeline	Risiko terbesar? (Data loss / Performance / Report discrepancy / Timeline / Budget / Skill gap / Business disruption / Lainnya) — pilih max 3	H	
+64	Tim & Timeline	Ada change management / training plan untuk end-user? (Ya / Belum / Tidak perlu)	M	
+65	Tim & Timeline	Lesson learned dari proyek migrasi SAP sebelumnya?	L	
+66	Lampiran	Export daftar DataSource aktif (RSA5/RSA6)	H	Terlampir / Menyusul / N/A
+67	Lampiran	Daftar InfoProvider aktif (RSDM/RSZC)	H	Terlampir / Menyusul / N/A
+68	Lampiran	Daftar Process Chain aktif	M	Terlampir / Menyusul / N/A
+69	Lampiran	Daftar BEx Query aktif (RSRT usage stats)	M	Terlampir / Menyusul / N/A
+70	Lampiran	SAP Readiness Check / Simplification List	H	Terlampir / Menyusul / N/A
+71	Lampiran	Current system landscape diagram	M	Terlampir / Menyusul / N/A
+72	Lampiran	BW Migration Cockpit report	M	Terlampir / Menyusul / N/A

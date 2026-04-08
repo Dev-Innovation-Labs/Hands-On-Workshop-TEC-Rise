@@ -506,24 +506,54 @@ define root view entity ZR_TEC_POREQ
   composition [0..*] of ZR_TEC_POREQI as _Items
 {
   key request_uuid      as RequestUUID,
+
+      @EndUserText.label: 'Request No'
       request_no        as RequestNo,
+
+      @EndUserText.label: 'Description'
       description       as Description,
+
+      @EndUserText.label: 'Company Code'
       company_code      as CompanyCode,
+
+      @EndUserText.label: 'Purchasing Org'
       purchasing_org    as PurchasingOrg,
+
+      @EndUserText.label: 'Purchasing Group'
       purchasing_group  as PurchasingGroup,
+
+      @EndUserText.label: 'Supplier'
       supplier          as Supplier,
+
+      @EndUserText.label: 'Supplier Name'
       supplier_name     as SupplierName,
+
+      @EndUserText.label: 'Order Date'
       order_date        as OrderDate,
+
+      @EndUserText.label: 'Delivery Date'
       delivery_date     as DeliveryDate,
+
+      @EndUserText.label: 'Total Amount'
       @Semantics.amount.currencyCode: 'Currency'
       total_amount      as TotalAmount,
+
+      @EndUserText.label: 'Currency'
       currency          as Currency,
+
+      @EndUserText.label: 'Notes'
       notes             as Notes,
+
+      @EndUserText.label: 'Status'
       status            as Status,
+
+      @EndUserText.label: 'SAP PO Number'
       sap_po_number     as SAPPONumber,
+
+      @EndUserText.label: 'SAP Post Message'
       sap_post_message  as SAPPostMessage,
 
-      // Criticality for status (like statusCriticality in CAP)
+      // Criticality for status
       case status
         when 'D' then 0  // Draft = neutral
         when 'P' then 3  // Posted = positive (green)
@@ -565,19 +595,41 @@ define view entity ZR_TEC_POREQI
 {
   key item_uuid        as ItemUUID,
       request_uuid     as RequestUUID,
+
+      @EndUserText.label: 'Request No'
       request_no       as RequestNo,
+
+      @EndUserText.label: 'Item No'
       item_no          as ItemNo,
+
+      @EndUserText.label: 'Material No'
       material_no      as MaterialNo,
+
+      @EndUserText.label: 'Description'
       description      as Description,
+
+      @EndUserText.label: 'Quantity'
       @Semantics.quantity.unitOfMeasure: 'UoM'
       quantity          as Quantity,
+
+      @EndUserText.label: 'UoM'
       uom              as UoM,
+
+      @EndUserText.label: 'Unit Price'
       @Semantics.amount.currencyCode: 'Currency'
       unit_price       as UnitPrice,
+
+      @EndUserText.label: 'Net Amount'
       @Semantics.amount.currencyCode: 'Currency'
       net_amount       as NetAmount,
+
+      @EndUserText.label: 'Currency'
       currency         as Currency,
+
+      @EndUserText.label: 'Plant'
       plant            as Plant,
+
+      @EndUserText.label: 'Material Group'
       material_group   as MaterialGroup,
 
       @Semantics.user.createdBy: true
