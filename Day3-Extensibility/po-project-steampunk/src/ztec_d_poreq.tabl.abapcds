@@ -1,0 +1,34 @@
+@EndUserText.label : 'Draft: PO Request Header'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table ztec_d_poreq {
+
+  key client             : abap.clnt not null;
+  key requestuuid        : sysuuid_x16 not null;
+  requestno              : abap.char(20);
+  description            : abap.char(200);
+  companycode            : abap.char(4);
+  purchasingorg          : abap.char(4);
+  purchasinggroup        : abap.char(3);
+  supplier               : abap.char(10);
+  suppliername           : abap.char(80);
+  orderdate              : abap.dats;
+  deliverydate           : abap.dats;
+  currency               : abap.cuky(5);
+  @Semantics.amount.currencyCode : 'ztec_d_poreq.currency'
+  totalamount            : abap.curr(15,2);
+  notes                  : abap.char(256);
+  status                 : abap.char(1);
+  sapponumber            : abap.char(10);
+  sappostmessage         : abap.char(200);
+  statuscriticality      : abap.int1;
+  createdby              : syuname;
+  createdat              : timestampl;
+  lastchangedby          : syuname;
+  lastchangedat          : timestampl;
+  locallastchanged       : timestampl;
+  "%admin"               : include sych_bdl_draft_admin_inc;
+
+}

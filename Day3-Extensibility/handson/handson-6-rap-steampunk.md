@@ -1018,6 +1018,117 @@ etag master LocalLastChanged
 
 ---
 
+### FASE 1.5: Buat Draft Tables Manual
+
+> **Kenapa manual?** Draft tables TIDAK auto-generated di sistem ini. Harus dibuat manual sebelum FASE 2.
+>
+> **⚠️ Field names harus CamelCase** (sesuai CDS alias), bukan snake_case (DB column).
+> Contoh: `requestuuid` bukan `request_uuid`, `companycode` bukan `company_code`.
+> Draft table = mirror dari CDS view, bukan dari persistent table.
+
+#### Draft Table Header — `ZTEC_D_POREQ`
+
+Klik kanan `$TMP` → New → Database Table  
+Name: `ZTEC_D_POREQ` | Description: `Draft: PO Request Header`
+
+```abap
+@EndUserText.label : 'Draft: PO Request Header'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table ztec_d_poreq {
+
+  key client             : abap.clnt not null;
+  key requestuuid        : sysuuid_x16 not null;
+  requestno              : abap.char(20);
+  description            : abap.char(200);
+  companycode            : abap.char(4);
+  purchasingorg          : abap.char(4);
+  purchasinggroup        : abap.char(3);
+  supplier               : abap.char(10);
+  suppliername           : abap.char(80);
+  orderdate              : abap.dats;
+  deliverydate           : abap.dats;
+  currency               : abap.cuky(5);
+  @Semantics.amount.currencyCode : 'ztec_d_poreq.currency'
+  totalamount            : abap.curr(15,2);
+  notes                  : abap.char(256);
+  status                 : abap.char(1);
+  sapponumber            : abap.char(10);
+  sappostmessage         : abap.char(200);
+  statuscriticality      : abap.int1;
+  createdby              : syuname;
+  createdat              : timestampl;
+  lastchangedby          : syuname;
+  lastchangedat          : timestampl;
+  locallastchanged       : timestampl;
+  "%admin"               : include sych_bdl_draft_admin_inc;
+
+}
+```
+
+Activate → lanjut items:
+
+#### Draft Table Items — `ZTEC_D_POREQI`
+
+Name: `ZTEC_D_POREQI` | Description: `Draft: PO Request Item`
+
+```abap
+@EndUserText.label : 'Draft: PO Request Item'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table ztec_d_poreqi {
+
+  key client             : abap.clnt not null;
+  key itemuuid           : sysuuid_x16 not null;
+  requestuuid            : sysuuid_x16 not null;
+  requestno              : abap.char(20);
+  itemno                 : abap.char(5);
+  materialno             : abap.char(40);
+  description            : abap.char(200);
+  @Semantics.quantity.unitOfMeasure : 'ztec_d_poreqi.uom'
+  quantity               : abap.quan(10,2);
+  uom                    : abap.unit(3);
+  @Semantics.amount.currencyCode : 'ztec_d_poreqi.currency'
+  unitprice              : abap.curr(15,2);
+  @Semantics.amount.currencyCode : 'ztec_d_poreqi.currency'
+  netamount              : abap.curr(15,2);
+  currency               : abap.cuky(5);
+  plant                  : abap.char(4);
+  materialgroup          : abap.char(9);
+  createdby              : syuname;
+  createdat              : timestampl;
+  lastchangedby          : syuname;
+  lastchangedat          : timestampl;
+  locallastchanged       : timestampl;
+  "%admin"               : include sych_bdl_draft_admin_inc;
+
+}
+```
+
+Activate → kedua draft tables harus aktif sebelum FASE 2.
+
+#### Perbandingan: Persistent Table vs Draft Table
+
+```
+Persistent Table (ztec_poreq):       Draft Table (ztec_d_poreq):
+══════════════════════════           ══════════════════════════
+key request_uuid  (snake_case)       key requestuuid  (CamelCase lowercase)
+company_code                         companycode
+supplier_name                        suppliername
+total_amount                         totalamount
+                                     statuscriticality  ← calculated field juga masuk!
+                                     "%admin" : include  ← wajib! draft admin fields
+```
+
+> **Aturan:** Draft table field names = **CDS alias lowercase** (tanpa underscore).
+> Karena `mapping` di BDEF translate CDS alias ↔ DB column. Draft table pakai CDS alias.
+
+---
+
 ### FASE 2: Tambah Draft + Additional Save + Strict
 
 Setelah FASE 1 sukses, **ganti SELURUH kode BDEF** dengan versi lengkap ini:
@@ -1138,40 +1249,46 @@ authorization dependent by _PORequest
 
 #### 5b-2. Activate FASE 2
 
-1. **Save** (Ctrl+S)
-2. Select **BDEF + Class** → **Activate** (Ctrl+F3)
+1. **Cmd+A** (Select All) di editor BDEF → **Delete** → Paste kode FASE 2 di atas
+2. **Save** (Cmd+S)
+3. **Activate** BDEF (klik kanan → Activate)
 
 ```
-✅ Draft tables ZTEC_D_POREQ & ZTEC_D_POREQI otomatis ter-generate
 ✅ BDEF sekarang full-featured: draft + strict(2) + additional save
+✅ Draft tables sudah ada (dibuat di FASE 1.5)
 ```
 
-> **Jika FASE 2 error `strict ( 2 )`:** Ganti ke `strict ( 1 );` atau hapus baris `strict` sama sekali.
+> **Jika error `strict ( 2 )`:** Ganti ke `strict ( 1 );` atau hapus baris `strict` sama sekali.
 > `strict ( 2 )` butuh SAP_BASIS ≥ 757. Jika sistem lebih lama, pakai `strict ( 1 )` saja.
+>
+> **Jika error type mismatch `STATUSCRITICALITY`:** Pastikan di draft table `ztec_d_poreq` field
+> `statuscriticality` bertipe `abap.int1` (bukan `abap.int4`). CASE expression di CDS return `int1`.
 
 ---
 
-### Kenapa 2 Fase?
+### Kenapa 2 Fase + Draft Table Manual?
 
 ```
-Masalah "Chicken and Egg":
-═════════════════════════
-
+Masalah 1: "Chicken and Egg"
+═════════════════════════════
 BDEF butuh draft table → tapi draft table di-generate saat BDEF aktif
-         ↓                              ↓
-    Error: "ZTEC_D_POREQ              BDEF tidak bisa aktif
-     is not declared"                  karena draft table tidak ada
-         ↓                              ↓
-    Cascading errors:                  → 13 errors!
-    - "is not a lock entity"
-    - "strict requires lock/auth"
-    - "no draft persistency"
+Solusi: Activate TANPA draft dulu (FASE 1) → baru tambah draft (FASE 2)
 
-Solusi: Activate TANPA draft dulu (FASE 1)
-        → BDEF aktif, class aktif
-        → Baru tambah draft (FASE 2)
-        → Draft tables auto-generated
-        → Semua error hilang ✅
+Masalah 2: Draft tables tidak auto-generated
+═════════════════════════════════════════════
+Beberapa sistem SAP tidak auto-generate draft tables.
+Solusi: Buat manual (FASE 1.5) sebelum FASE 2.
+
+Masalah 3: Field name convention
+════════════════════════════════
+Persistent table: snake_case (request_uuid, company_code)
+Draft table:      CDS alias lowercase (requestuuid, companycode)
+Kenapa? Draft table = mirror CDS view, bukan mirror DB table.
+
+Alur lengkap:
+  FASE 1   → Basic managed (tanpa draft) → Activate ✅
+  FASE 1.5 → Buat draft tables manual → Activate ✅
+  FASE 2   → Full BDEF (draft + strict + additional save) → Activate ✅
 ```
 
 > **Lihat [Glosarium D](#d-behavior-definition-keywords)** untuk penjelasan lengkap setiap keyword di Behavior Definition. Dan **[Glosarium E](#e-behavior-implementation--eml-entity-manipulation-language)** untuk EML statements di Langkah 6.

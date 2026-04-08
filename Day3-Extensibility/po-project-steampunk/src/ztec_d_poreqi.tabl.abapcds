@@ -1,0 +1,32 @@
+@EndUserText.label : 'Draft: PO Request Item'
+@AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+@AbapCatalog.tableCategory : #TRANSPARENT
+@AbapCatalog.deliveryClass : #A
+@AbapCatalog.dataMaintenance : #RESTRICTED
+define table ztec_d_poreqi {
+
+  key client             : abap.clnt not null;
+  key itemuuid           : sysuuid_x16 not null;
+  requestuuid            : sysuuid_x16 not null;
+  requestno              : abap.char(20);
+  itemno                 : abap.char(5);
+  materialno             : abap.char(40);
+  description            : abap.char(200);
+  @Semantics.quantity.unitOfMeasure : 'ztec_d_poreqi.uom'
+  quantity               : abap.quan(10,2);
+  uom                    : abap.unit(3);
+  @Semantics.amount.currencyCode : 'ztec_d_poreqi.currency'
+  unitprice              : abap.curr(15,2);
+  @Semantics.amount.currencyCode : 'ztec_d_poreqi.currency'
+  netamount              : abap.curr(15,2);
+  currency               : abap.cuky(5);
+  plant                  : abap.char(4);
+  materialgroup          : abap.char(9);
+  createdby              : syuname;
+  createdat              : timestampl;
+  lastchangedby          : syuname;
+  lastchangedat          : timestampl;
+  locallastchanged       : timestampl;
+  "%admin"               : include sych_bdl_draft_admin_inc;
+
+}
