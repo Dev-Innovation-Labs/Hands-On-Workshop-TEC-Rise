@@ -1371,13 +1371,10 @@ ENDCLASS.
 CLASS lhc_PORequest IMPLEMENTATION.
 
   METHOD get_global_authorizations.
-    " No auth check for workshop
-    LOOP AT requested_authorizations ASSIGNING FIELD-SYMBOL(<auth>).
-      result = VALUE #( ( %tky = <auth>-%tky
-                          %create = if_abap_behv=>auth-allowed
-                          %update = if_abap_behv=>auth-allowed
-                          %delete = if_abap_behv=>auth-allowed ) ).
-    ENDLOOP.
+    " No auth check for workshop — allow all operations
+    result-%create = if_abap_behv=>auth-allowed.
+    result-%update = if_abap_behv=>auth-allowed.
+    result-%delete = if_abap_behv=>auth-allowed.
   ENDMETHOD.
 
   METHOD setRequestNo.
