@@ -894,12 +894,135 @@ annotate service.PORequests with @(      @Metadata.layer: #CUSTOMER
 Klik kanan `ZR_TEC_POREQ` (Interface View) → **New Behavior Definition**  
 Implementation Type: **Managed**
 
-> **⚠️ PENTING — Jangan langsung Activate!**
-> 1. Paste kode di bawah → **Save** saja (Ctrl+S)
-> 2. Lanjut ke **Langkah 6** dulu (buat class `ZBP_TEC_POREQ`)
-> 3. Baru kemudian Activate BDEF + Class **bersamaan** (Ctrl+F3)
+> **⚠️ Aktivasi BDEF dilakukan 2 FASE untuk menghindari error cascading.**
+> Fase 1 → basic managed (tanpa draft) → Fase 2 → tambah draft + additional save.
 
-### 5a. Kode BDEF — Copy persis seperti ini:
+---
+
+### FASE 1: Basic Managed (tanpa draft)
+
+#### 5a-1. Paste kode FASE 1 ini:
+
+```abap
+managed implementation in class ZBP_TEC_POREQ unique;
+
+define behavior for ZR_TEC_POREQ alias PORequest
+persistent table ztec_poreq
+lock master
+authorization master ( global )
+etag master LocalLastChanged
+
+{
+  create;
+  update;
+  delete;
+
+  action postToSAP result [1] $self;
+
+  determination setRequestNo on modify { create; }
+
+  validation validateSupplier on save { create; update; field Supplier; }
+  validation validateDeliveryDate on save { create; update; field DeliveryDate; }
+
+  field ( numbering : managed ) RequestUUID;
+  field ( readonly ) RequestNo, TotalAmount, StatusCriticality,
+                     SAPPONumber, SAPPostMessage, CreatedBy, CreatedAt,
+                     LastChangedBy, LastChangedAt, LocalLastChanged;
+  field ( readonly : update ) Status;
+
+  mapping for ztec_poreq
+  {
+    RequestUUID    = request_uuid;
+    RequestNo      = request_no;
+    Description    = description;
+    CompanyCode    = company_code;
+    PurchasingOrg  = purchasing_org;
+    PurchasingGroup = purchasing_group;
+    Supplier       = supplier;
+    SupplierName   = supplier_name;
+    OrderDate      = order_date;
+    DeliveryDate   = delivery_date;
+    TotalAmount    = total_amount;
+    Currency       = currency;
+    Notes          = notes;
+    Status         = status;
+    SAPPONumber    = sap_po_number;
+    SAPPostMessage = sap_post_message;
+    CreatedBy      = created_by;
+    CreatedAt      = created_at;
+    LastChangedBy  = last_changed_by;
+    LastChangedAt  = last_changed_at;
+    LocalLastChanged = local_last_changed;
+  }
+
+  association _Items { create; }
+}
+
+define behavior for ZR_TEC_POREQI alias PORequestItem
+persistent table ztec_poreqi
+lock dependent by _PORequest
+authorization dependent by _PORequest
+etag master LocalLastChanged
+
+{
+  update;
+  delete;
+
+  determination calcNetAmount on modify { create; update; field Quantity, UnitPrice; }
+  determination calcHeaderTotal on modify { create; update; delete; }
+
+  field ( numbering : managed ) ItemUUID;
+  field ( readonly ) RequestUUID, RequestNo,
+                     CreatedBy, CreatedAt, LastChangedBy, LastChangedAt, LocalLastChanged;
+
+  mapping for ztec_poreqi
+  {
+    ItemUUID       = item_uuid;
+    RequestUUID    = request_uuid;
+    RequestNo      = request_no;
+    ItemNo         = item_no;
+    MaterialNo     = material_no;
+    Description    = description;
+    Quantity       = quantity;
+    UoM            = uom;
+    UnitPrice      = unit_price;
+    NetAmount      = net_amount;
+    Currency       = currency;
+    Plant          = plant;
+    MaterialGroup  = material_group;
+    CreatedBy      = created_by;
+    CreatedAt      = created_at;
+    LastChangedBy  = last_changed_by;
+    LastChangedAt  = last_changed_at;
+    LocalLastChanged = local_last_changed;
+  }
+
+  association _PORequest;
+}
+```
+
+#### 5a-2. Buat Class + Activate FASE 1
+
+1. **Save** BDEF (Ctrl+S) — mungkin ada warning, abaikan
+2. Letakkan cursor di `ZBP_TEC_POREQ` (baris 1) → **Ctrl+1** (Quick Fix) → **Create behavior implementation class**
+   - Jika Quick Fix tidak muncul: Klik kanan `$TMP` → New → ABAP Class → name `ZBP_TEC_POREQ`
+3. Buka class → tab **Local Types** → Paste kode dari **Langkah 6** di bawah → **Save** (Ctrl+S)
+4. Select **BDEF + Class** bersamaan (tahan Ctrl) → **Activate** (Ctrl+F3)
+
+```
+✅ Jika sukses → lanjut ke FASE 2
+❌ Jika error "class does not exist" → class belum ter-save, save dulu
+❌ Jika error lain → pastikan Tables (ZTEC_POREQ, ZTEC_POREQI) dan
+   CDS Views (ZR_TEC_POREQ, ZR_TEC_POREQI) sudah aktif
+```
+
+---
+
+### FASE 2: Tambah Draft + Additional Save + Strict
+
+Setelah FASE 1 sukses, **ganti SELURUH kode BDEF** dengan versi lengkap ini:
+
+#### 5b-1. Paste kode FASE 2 (replace seluruh isi BDEF):
 
 ```abap
 managed with additional save
@@ -1013,102 +1136,43 @@ authorization dependent by _PORequest
 }
 ```
 
-Setelah paste → **Ctrl+S** (Save saja, JANGAN Activate dulu!)
+#### 5b-2. Activate FASE 2
 
-### 5b. Penjelasan Keyword BDEF
-
-**Header (sebelum `{`):**
-
-| Keyword | Artinya |
-|:--------|:--------|
-| `managed with additional save` | Framework auto-handle CRUD, + kita tambah logic di save phase (untuk BAPI) |
-| `implementation in class ZBP_TEC_POREQ unique` | Logic ABAP ada di class ini (dibuat di Langkah 6) |
-| `strict ( 2 )` | Enforce best practices — error kalau ada pelanggaran |
-| `with draft` | Enable Fiori draft/edit mode |
-| `persistent table ztec_poreq` | Tabel untuk data aktif (bukan draft) |
-| `draft table ztec_d_poreq` | Tabel draft — **otomatis di-generate** saat activate |
-| `etag master LocalLastChanged` | Optimistic locking (concurrency control) |
-| `lock master total etag LastChangedAt` | Entity ini yang mengelola lock |
-| `authorization master ( global )` | Auth check di level root entity |
-
-**Di dalam `{}`:**
-
-| Keyword | Artinya | Setara CAP |
-|:--------|:--------|:-----------|
-| `create; update; delete;` | Standard CRUD | Otomatis di CAP |
-| `draft action Edit` | Copy data aktif → draft table | — |
-| `draft action Activate optimized` | Validasi + pindah draft → tabel aktif | — |
-| `draft action Discard` | Hapus draft, kembali ke data aktif | — |
-| `draft action Resume` | Buka kembali draft yang ditinggalkan | — |
-| `draft determine action Prepare { ... }` | Pre-check sebelum Activate (validasi dijalankan di sini) | — |
-| `action postToSAP result [1] $self` | Custom action — tombol di Fiori UI | `action postToSAP()` |
-| `determination setRequestNo on modify { create; }` | Auto-logic saat create | `this.before('CREATE', ...)` |
-| `validation validateSupplier on save { ... }` | Cek aturan bisnis saat save | `this.before('SAVE', ...)` |
-| `field ( numbering : managed ) RequestUUID` | UUID di-generate otomatis oleh framework | `cuid` aspect di CAP |
-| `field ( readonly ) ...` | Tidak bisa diedit user di UI | `@readonly` di CAP |
-| `field ( readonly : update ) Status` | Bisa set saat create, readonly saat update | — |
-| `mapping for ztec_poreq { ... }` | Map CDS field name → DB column name | Otomatis di CAP |
-| `association _Items { create; with draft; }` | Items bisa di-create via parent (deep insert) | `Composition of many` |
-
-**Child entity (`ZR_TEC_POREQI`):**
-
-| Keyword | Artinya |
-|:--------|:--------|
-| `lock dependent by _PORequest` | Lock dikelola oleh parent |
-| `authorization dependent by _PORequest` | Auth check ikut parent |
-| Tidak ada `create;` | Items hanya bisa dibuat via parent (composition) |
-| `determination calcNetAmount` | Hitung Quantity × UnitPrice |
-| `determination calcHeaderTotal` | Hitung ulang total di header |
-
-### 5c. Buat Behavior Implementation Class
-
-> **"New Behavior Implementation" tidak muncul di menu?**  
-> Itu normal — opsi itu tidak selalu ada di context menu. Gunakan **Quick Fix** atau buat class manual.
-
-**Cara 1 — Quick Fix (Paling Mudah):**
-
-1. Di editor BDEF, letakkan cursor di nama class `ZBP_TEC_POREQ` (baris 2)
-2. Tekan **Ctrl+1** (Quick Fix)
-3. Pilih **"Create behavior implementation class ZBP_TEC_POREQ"**
-4. Finish → Class otomatis terbuat
-
-**Cara 2 — Manual (Jika Quick Fix tidak muncul):**
-
-1. Klik kanan package `$TMP` → **New → ABAP Class**
-2. Name: `ZBP_TEC_POREQ`
-3. Description: `TEC Rise - PO Request Behavior`
-4. **Add Interface**: `IF_ABAP_BEHAVIOR_SAVER` (untuk additional save)
-5. Finish → Class terbuat
-
-**Setelah class terbuat:**
-
-1. Buka class `ZBP_TEC_POREQ`
-2. Klik tab **"Local Types"** (di bawah editor)
-3. Paste kode dari **Langkah 6** di bawah
-4. **Ctrl+S** (Save)
-
-### 5d. Aktivasi Bersamaan
+1. **Save** (Ctrl+S)
+2. Select **BDEF + Class** → **Activate** (Ctrl+F3)
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Di Project Explorer, select KEDUA object:              │
-│  (tahan Ctrl, klik satu-satu)                          │
-│                                                         │
-│     ☑ ZR_TEC_POREQ (Behavior Definition)               │
-│     ☑ ZBP_TEC_POREQ (Class)                            │
-│                                                         │
-│  → Klik kanan → Activate (atau Ctrl+F3)                │
-│                                                         │
-│  ✅ Draft tables ZTEC_D_POREQ & ZTEC_D_POREQI          │
-│     otomatis ter-generate                               │
-└─────────────────────────────────────────────────────────┘
+✅ Draft tables ZTEC_D_POREQ & ZTEC_D_POREQI otomatis ter-generate
+✅ BDEF sekarang full-featured: draft + strict(2) + additional save
 ```
 
-> **Troubleshooting Aktivasi:**
-> - Error `"Class ZBP_TEC_POREQ does not exist"` → class belum dibuat, ikuti 5c
-> - Error `"ZTEC_D_POREQ is not declared"` → ini draft table, otomatis dibuat saat BDEF aktif — abaikan dulu
-> - Error `"is not a lock entity"` → biasanya karena BDEF belum di-save, tekan Ctrl+S dulu
-> - Jika masih error → pastikan Table `ZTEC_POREQ` dan CDS View `ZR_TEC_POREQ` sudah aktif
+> **Jika FASE 2 error `strict ( 2 )`:** Ganti ke `strict ( 1 );` atau hapus baris `strict` sama sekali.
+> `strict ( 2 )` butuh SAP_BASIS ≥ 757. Jika sistem lebih lama, pakai `strict ( 1 )` saja.
+
+---
+
+### Kenapa 2 Fase?
+
+```
+Masalah "Chicken and Egg":
+═════════════════════════
+
+BDEF butuh draft table → tapi draft table di-generate saat BDEF aktif
+         ↓                              ↓
+    Error: "ZTEC_D_POREQ              BDEF tidak bisa aktif
+     is not declared"                  karena draft table tidak ada
+         ↓                              ↓
+    Cascading errors:                  → 13 errors!
+    - "is not a lock entity"
+    - "strict requires lock/auth"
+    - "no draft persistency"
+
+Solusi: Activate TANPA draft dulu (FASE 1)
+        → BDEF aktif, class aktif
+        → Baru tambah draft (FASE 2)
+        → Draft tables auto-generated
+        → Semua error hilang ✅
+```
 
 > **Lihat [Glosarium D](#d-behavior-definition-keywords)** untuk penjelasan lengkap setiap keyword di Behavior Definition. Dan **[Glosarium E](#e-behavior-implementation--eml-entity-manipulation-language)** untuk EML statements di Langkah 6.
 
