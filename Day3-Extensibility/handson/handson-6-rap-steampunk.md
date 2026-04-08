@@ -1003,11 +1003,24 @@ etag master LocalLastChanged
 
 #### 5a-2. Buat Class + Activate FASE 1
 
-1. **Save** BDEF (Ctrl+S) — mungkin ada warning, abaikan
-2. Letakkan cursor di `ZBP_TEC_POREQ` (baris 1) → **Ctrl+1** (Quick Fix) → **Create behavior implementation class**
-   - Jika Quick Fix tidak muncul: Klik kanan `$TMP` → New → ABAP Class → name `ZBP_TEC_POREQ`
-3. Buka class → tab **Local Types** → Paste kode dari **Langkah 6** di bawah → **Save** (Ctrl+S)
-4. Select **BDEF + Class** bersamaan (tahan Ctrl) → **Activate** (Ctrl+F3)
+1. **Save** BDEF (Cmd+S) — mungkin ada warning, abaikan
+2. Letakkan cursor di `ZBP_TEC_POREQ` (baris 1) → **Cmd+1** (Quick Fix) → **Create behavior implementation class**
+3. Buka class → tab **Local Types** → Paste kode dari **Langkah 6** di bawah → **Save** (Cmd+S)
+4. Select **BDEF + Class** bersamaan (tahan Cmd) → **Activate** (Fn+F3)
+
+> **⚠️ PENTING: JANGAN buat class via "New → ABAP Class"!**
+>
+> Class **HARUS** dibuat via **Quick Fix dari BDEF** (Cmd+1) agar otomatis punya:
+> ```abap
+> CLASS zbp_tec_poreq DEFINITION PUBLIC ABSTRACT FINAL
+>   FOR BEHAVIOR OF zr_tec_poreq.
+> ```
+> Jika class dibuat manual via "New → ABAP Class", dia jadi **regular class** tanpa
+> `FOR BEHAVIOR OF` dan akan error:
+> *"Local classes of CL_ABAP_BEHAVIOR_HANDLER can only be derived in the
+> Local Definitions/Implementations of a global BEHAVIOR class."*
+>
+> **Fix jika sudah terlanjur:** Delete class → buat ulang via Quick Fix dari BDEF.
 
 ```
 ✅ Jika sukses → lanjut ke FASE 2
